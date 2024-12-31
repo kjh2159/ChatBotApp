@@ -140,7 +140,14 @@ import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContract
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.text.style.TextAlign
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.CountDownLatch
 
 fun Context.getActivity(): ComponentActivity? = when (this) {
@@ -735,9 +742,9 @@ class MainActivity : ComponentActivity() {
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun iso8601ToMillis(dateTime: String): Long {
-        val formatter = java.time.format.DateTimeFormatter.ISO_DATE_TIME
-        val localDateTime = java.time.LocalDateTime.parse(dateTime, formatter)
-        val zonedDateTime = localDateTime.atZone(java.time.ZoneId.systemDefault())
+        val formatter = DateTimeFormatter.ISO_DATE_TIME
+        val localDateTime = LocalDateTime.parse(dateTime, formatter)
+        val zonedDateTime = localDateTime.atZone(ZoneId.systemDefault())
         return zonedDateTime.toInstant().toEpochMilli()
     }
 
@@ -1239,15 +1246,22 @@ fun Chat(
         },
         bottomBar = {
             if (imageViewerState.visible) null else BottomAppBar {
-                ChatInput(!isBusy && !isLoading, withImage = modelType == 1, onImageSelected = {
-                    vm.setPreviewUri(it)
-                }
+                ChatInput(
+                    !isBusy && !isLoading,
+                    withImage = modelType == 1,
+                    onImageSelected = { vm.setPreviewUri(it) }
                 ) {
                     //TODO
                     //Get timestamp
-//                    vm.sendInstruct(context, it)
+                    //vm.sendInstruct(context, it)
+
                     vm.sendMessage(context, it)
+                    //scope.launch {
+                    //    vm.sendMessages(context, it)
+                    //}
                 }
+                //vm.sendMessage(context, it)
+                //Log.d("CHECKER", it.text)
             }
         }) {
 
@@ -1263,8 +1277,9 @@ fun Chat(
             //write a banner widget
             if (vm.profilingTime.value != null && vm.profilingTime.value?.size!! > 0) Row(
                 modifier = Modifier
-                    .fillMaxWidth().background(MaterialTheme.colorScheme.primaryContainer)
-                   , horizontalArrangement = Arrangement.Center
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                , horizontalArrangement = Arrangement.Center
             ) {
                 Text(
                     text = "Prefill: ${String.format("%.2f",vm.profilingTime.value!![1])}Tok/s, Decode: ${String.format("%.2f",vm.profilingTime.value!![2])}Tok/s",
@@ -1351,7 +1366,6 @@ fun Chat(
             }
         })
     }
-
 }
 
 fun getBubbleShape(
@@ -1438,7 +1452,6 @@ fun ChatInput(
     enable: Boolean,
     withImage: Boolean,
     onImageSelected: (Uri?) -> Unit = {},
-
     onMessageSend: (Message) -> Unit = {}
 ) {
     var text by remember { mutableStateOf("") }
@@ -1485,19 +1498,14 @@ fun ChatInput(
 
         )
         IconButton(onClick = {
-            keyboardController?.hide()
-            val punctuation = listOf('.', '?', '!', ',', ';', ':', '。', '？', '！', '，', '；', '：')
-            if (text.isNotEmpty() && !punctuation.contains(text.last()) && text.last() != '\n') text += "."
-            onMessageSend(
-                Message(
-                    text,
-                    true,
-                    0,
-                    type = if (imageUri.value == null) MessageType.TEXT else MessageType.IMAGE,
-                    content = imageUri.value
-                )
-            );text = "";imageUri.value = null;onImageSelected(null)
-        }, enabled = enable) {
+            performSend(
+                txt = text,
+                imageUri = imageUri,
+                onImageSelected = onImageSelected,
+                onMessageSend = onMessageSend,
+                keyboardController = keyboardController
+            )
+        },enabled = enable) {
             Icon(
                 painter = painterResource(id = R.drawable.up),
                 contentDescription = "Send",
@@ -1508,6 +1516,28 @@ fun ChatInput(
     }
 
 }
+
+fun performSend(txt: String,
+                imageUri: MutableState<Uri?>,
+                onImageSelected: (Uri?) -> Unit,
+                onMessageSend: (Message) -> Unit,
+                keyboardController: SoftwareKeyboardController?)
+{
+    keyboardController?.hide()
+    val punctuation = listOf('.', '?', '!', ',', ';', ':', '。', '？', '！', '，', '；', '：')
+    var text = txt
+    if (text.isNotEmpty() && !punctuation.contains(text.last()) && text.last() != '\n') text += "."
+    onMessageSend(
+        Message(
+            text,
+            true,
+            0,
+            type = if (imageUri.value == null) MessageType.TEXT else MessageType.IMAGE,
+            content = imageUri.value
+        )
+    );text = "";imageUri.value = null;onImageSelected(null)
+}
+
 
 @Composable
 fun ColumnScope.ChatBubble(
@@ -1769,7 +1799,7 @@ fun HistoryItem(icon: Int, text: String, modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .align(Alignment.CenterVertically)
                     .size(26.dp),
-                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black)
+                colorFilter = ColorFilter.tint(Color.Black)
 
             )
             Spacer(modifier = Modifier.width(6.dp))
@@ -1788,7 +1818,7 @@ fun HistoryItem(icon: Int, text: String, modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .align(Alignment.CenterVertically)
                     .size(32.dp),
-                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black)
+                colorFilter = ColorFilter.tint(Color.Black)
 
             )
         }

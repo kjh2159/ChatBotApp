@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.Looper
 import android.util.Log
 import androidx.compose.foundation.ScrollState
 import androidx.lifecycle.MutableLiveData
@@ -14,6 +15,7 @@ import androidx.lifecycle.viewModelScope
 import coil.request.ImageRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 data class Photo(
@@ -35,11 +37,11 @@ Now my query is: %QUERY%
 """
 val MODEL_NAMES = arrayOf("Qwen 2.5","","Bert","PhoneLM", "Qwen 1.5")
 class ChatViewModel : ViewModel() {
-//    private var _inputText: MutableLiveData<String> = MutableLiveData<String>()
+    //    private var _inputText: MutableLiveData<String> = MutableLiveData<String>()
 //    val inputText: LiveData<String> = _inputText
     private var _messageList: MutableLiveData<List<Message>> = MutableLiveData<List<Message>>(
-    listOf()
-)
+        listOf()
+    )
     private var _photoList: MutableLiveData<List<Photo>> = MutableLiveData<List<Photo>>(
         listOf()
     )
@@ -83,14 +85,14 @@ class ChatViewModel : ViewModel() {
         return photo.id
     }
 
-//    private var _assetUri = MutableLiveData<Uri?>(null)
+    //    private var _assetUri = MutableLiveData<Uri?>(null)
 //    val assetUri = _assetUri
 //    fun setInputText(text: String) {
 //        _inputText.value = text
 //    }
     init {
 
-    JNIBridge.setCallback { id,value, isStream,profile ->
+        JNIBridge.setCallback { id,value, isStream,profile ->
 //            val message = Message(
 //                value,
 //                false,
@@ -102,11 +104,11 @@ class ChatViewModel : ViewModel() {
             updateMessage(id,value.trim().replace("|NEWLINE|","\n").replace("▁"," "),isStream)
             if (!isStream){
                 _isBusy.postValue(false)
-               if(profile.isNotEmpty()) profiling_time.postValue(profile)
+                if(profile.isNotEmpty()) profiling_time.postValue(profile)
             }
         }
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        _isExternalStorageManager.value = Environment.isExternalStorageManager()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            _isExternalStorageManager.value = Environment.isExternalStorageManager()
         } else {
             TODO("VERSION.SDK_INT < R")
         }
@@ -115,16 +117,25 @@ class ChatViewModel : ViewModel() {
     }
     fun addMessage(message: Message,remote:Boolean=false) {
         if (message.isUser){
-                message.id = _lastId++
-            }
+            message.id = _lastId++
+        }
         val list = (_messageList.value?: listOf()).plus(message)
 
         if (remote){
-            _messageList.postValue(list)
+            if (Thread.currentThread() == Looper.getMainLooper().thread) {
+                _messageList.value = list
+            } else {
+                // 백그라운드 스레드에서 호출 시 postValue() 사용
+                _messageList.postValue(list)
+            }
         }
         else{
-            _messageList.value = list
-
+            if (Thread.currentThread() == Looper.getMainLooper().thread) {
+                _messageList.value = list
+            } else {
+                // 백그라운드 스레드에서 호출 시 postValue() 사용
+                _messageList.postValue(list)
+            }
         }
     }
     fun sendInstruct(content: Context,message: Message){
@@ -156,17 +167,22 @@ class ChatViewModel : ViewModel() {
             val bot_message = Message("...",false,0)
             bot_message.id = _lastId++
             addMessage(bot_message)
-            _isBusy.value = true
+
+            if (Thread.currentThread() == Looper.getMainLooper().thread) {
+                _isBusy.value = true
+            } else {
+                _isBusy.postValue(true)
+            }
             if (arrayOf(0,2,3).contains(modelType.value)){
 //            if (modelType.value == 0){
                 CoroutineScope(Dispatchers.IO).launch {
 //                val run_text = "A dialog, where User interacts with AI. AI is helpful, kind, obedient, honest, and knows its own limits.\nUser: ${message.text}"
-                   val profiling_time = JNIBridge.run(bot_message.id,message.text,100)
+                    val profiling_time = JNIBridge.run(bot_message.id,message.text,100)
                     Log.i("chatViewModel","profiling_time:$profiling_time")
                 }
             }else if (modelType.value ==1){
                 val image_content = if (message.type==MessageType.IMAGE){
-                   val uri =  message.content as Uri?
+                    val uri =  message.content as Uri?
                     val inputStream = uri?.let { context.contentResolver.openInputStream(it) }
                     inputStream?.readBytes()?:byteArrayOf()
                 } else {
@@ -177,13 +193,27 @@ class ChatViewModel : ViewModel() {
                     JNIBridge.runImage(bot_message.id, image = image_content,message.text,100)
                 }
 
-        }}}
+            }}}
+
+    suspend fun sendMessages(context: Context, message: Message){
+        val questions = listOf("hello", "nice to meet you", "good morning")
+        var idx = 0
+        Log.i("CHECKER", "PASS")
+        coroutineScope {
+            launch(Dispatchers.IO) {
+                while (idx < questions.size) {
+                    sendMessage(context, Message(questions[idx], true, 0, MessageType.TEXT, null))
+                    idx++
+                }
+            }
+        }
+    }
 
     fun initStatus(context: Context,modelType:Int=_modelType.value?:0){
         if (_isExternalStorageManager.value != true) return;
-        Log.e("chatViewModel", "initStatus$modelType")
         val model_info = "$modelId:$modelType"
         val model_id = modelId.value
+        Log.e("chatViewModel", "initStatus$modelType-$model_id")
         //modelId: 0->PhoneLM,1->Qwen
         val modelPath = when(modelType){
             3->{
@@ -313,7 +343,7 @@ class ChatViewModel : ViewModel() {
         }
         if (!isStreaming&&modelType.value==4){
             message?.text="Done for you."
-           val functions = parseFunctionCall(content)
+            val functions = parseFunctionCall(content)
             functions.forEach {
                 functions_?.execute(it)
             }
@@ -411,7 +441,7 @@ class SummaryViewModel:ViewModel(){
         viewModelScope.launch(Dispatchers.IO)  {
             JNIBridge.run(msg.id,message,100)
         }
-}}
+    }}
 class PhotoViewModel : ViewModel() {
     private var _message: MutableLiveData<Message> = MutableLiveData<Message>()
     val message = _message
