@@ -7,8 +7,11 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.Looper
+import android.text.BoringLayout
 import android.util.Log
 import androidx.compose.foundation.ScrollState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -64,6 +67,9 @@ class ChatViewModel : ViewModel() {
     val modelType = _modelType
     private var profiling_time = MutableLiveData<DoubleArray>()
     val profilingTime = profiling_time
+
+    var isActive = mutableStateOf(false)
+
 
     private var _backendType = -1
     fun setModelType(type:Int){
@@ -158,6 +164,7 @@ class ChatViewModel : ViewModel() {
         }
     }
     fun sendMessage(context:Context,message: Message){
+        isActive.value = true
         if (modelType.value==4){
             sendInstruct(context,message)
             return
@@ -179,6 +186,7 @@ class ChatViewModel : ViewModel() {
 //                val run_text = "A dialog, where User interacts with AI. AI is helpful, kind, obedient, honest, and knows its own limits.\nUser: ${message.text}"
                     val profiling_time = JNIBridge.run(bot_message.id,message.text,100)
                     Log.i("chatViewModel","profiling_time:$profiling_time")
+                    isActive.value = false
                 }
             }else if (modelType.value ==1){
                 val image_content = if (message.type==MessageType.IMAGE){

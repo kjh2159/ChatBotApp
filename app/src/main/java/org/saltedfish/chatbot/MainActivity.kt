@@ -10,6 +10,7 @@ import android.graphics.Bitmap
 import android.icu.util.Calendar
 import android.media.RingtoneManager
 import android.net.Uri
+import android.os.AsyncTask
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -140,15 +141,27 @@ import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContract
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.SoftwareKeyboardController
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import java.io.BufferedReader
+import java.io.File
+import java.io.FileWriter
+import java.io.InputStreamReader
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
 
 fun Context.getActivity(): ComponentActivity? = when (this) {
     is ComponentActivity -> this
@@ -1238,7 +1251,7 @@ fun Chat(
                 Text(
                     text = "Chat", fontWeight = FontWeight.Bold, fontSize = 24.sp
                 )
-            }, navigationIcon = {
+            }, navigationIcon =  {
                 IconButton(onClick = { navController.popBackStack() }) {
                     Icon(Icons.Rounded.ArrowBack, contentDescription = "Back")
                 }
@@ -1246,23 +1259,26 @@ fun Chat(
         },
         bottomBar = {
             if (imageViewerState.visible) null else BottomAppBar {
+
+
                 ChatInput(
                     !isBusy && !isLoading,
+                    vm = vm,
+                    context = context,
                     withImage = modelType == 1,
                     onImageSelected = { vm.setPreviewUri(it) }
                 ) {
                     //TODO
                     //Get timestamp
                     //vm.sendInstruct(context, it)
+                    //vm.sendMessage(context, it) // original version
 
-                    vm.sendMessage(context, it)
-                    //scope.launch {
-                    //    vm.sendMessages(context, it)
-                    //}
+                    // Input-query stream is implemented in ChatInput
+
                 }
-                //vm.sendMessage(context, it)
-                //Log.d("CHECKER", it.text)
             }
+
+
         }) {
 
         Column(
@@ -1446,19 +1462,41 @@ fun BoxScope.PreviewBubble(preview: Uri) {
     }
 }
 
+@SuppressLint("UnrememberedMutableState")
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ChatInput(
     enable: Boolean,
     withImage: Boolean,
+    vm: ChatViewModel,
+    context: Context,
     onImageSelected: (Uri?) -> Unit = {},
     onMessageSend: (Message) -> Unit = {}
 ) {
     var text by remember { mutableStateOf("") }
     var imageUri = remember { mutableStateOf<Uri?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+    var qa_idx = 0
+    // load csv file for hotpot qa
+    var qa_lists = readCSV(context = context, filename = "datasets/hotpot_qa.csv")
+    val qa_limit = 10
+    var prefill_tot: Double = 0.0
+    var decode_tot: Double = 0.0
+    var sigterm = mutableStateOf(false)
+    var queryTimes = ArrayList<ArrayList<String>>()
 
 //softkeyborad
     val keyboardController = LocalSoftwareKeyboardController.current
+    val onSendButtonClicked: () -> Unit = { // pj custom
+        var msg = performSend(
+                    txt = text,
+                    imageUri = imageUri,
+                    onImageSelected = onImageSelected,
+                    onMessageSend = onMessageSend,
+                    keyboardController = keyboardController
+            )
+        vm.sendMessage(context, msg)
+    }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) {
         it?.let {
@@ -1467,6 +1505,8 @@ fun ChatInput(
         }
 
     }
+
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
@@ -1497,22 +1537,68 @@ fun ChatInput(
                 )
 
         )
-        IconButton(onClick = {
-            performSend(
-                txt = text,
-                imageUri = imageUri,
-                onImageSelected = onImageSelected,
-                onMessageSend = onMessageSend,
-                keyboardController = keyboardController
-            )
-        },enabled = enable) {
+        IconButton(onClick = onSendButtonClicked, enabled = enable) {
             Icon(
                 painter = painterResource(id = R.drawable.up),
                 contentDescription = "Send",
                 Modifier.size(36.dp)
             )
         }
+        TextButton(onClick =  {
+            // for hotpot_qa
+            // not for general usage yet
 
+            //recording start
+            val startTime = System.currentTimeMillis()
+            CoroutineScope(Dispatchers.IO).launch {
+                recordProcessing("", "", startTime, sigterm)
+            }
+
+            coroutineScope.launch {
+                qa_idx = 1
+                while (qa_idx < qa_limit+1) {
+
+                    if (qa_idx != 1) {
+                        prefill_tot += vm.profilingTime.value!![1] ?: 0.0
+                        decode_tot += vm.profilingTime.value!![2] ?: 0.0
+                    }
+                    vm.isActive.value = true    // inform LLM active: isActive turns false in JNIrun function.
+                    text = qa_lists[qa_idx][1]  //
+                    val temp = arrayListOf((System.currentTimeMillis()-startTime).toString()) // store system time
+                    onSendButtonClicked()
+                    qa_idx++
+//              text = "write"
+//              onSendButtonClicked()
+
+                    while ( vm.isActive.value ){
+                        //Log.e("CHECKER", "Active")
+                        delay(10)
+                        continue
+                    }
+                    temp.add(vm.profilingTime.value!![1].toString())
+                    temp.add(vm.profilingTime.value!![2].toString())
+                    queryTimes.add(temp) // add system time
+                }
+
+                sigterm.value = true
+                //android.os.Process.killProcess(r_pid.intValue)
+                writeRecord("/sdcard/Documents", "time_test.txt", queryTimes)
+
+                //Thread.sleep(1000) // for stability
+                //android.os.Process.killProcess(android.os.Process.myPid()) // activate if you want to check experiment termination
+
+            }
+        }) {
+            Text(
+                text = "Test",
+                style = TextStyle(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            )
+
+
+        }
     }
 
 }
@@ -1521,21 +1607,24 @@ fun performSend(txt: String,
                 imageUri: MutableState<Uri?>,
                 onImageSelected: (Uri?) -> Unit,
                 onMessageSend: (Message) -> Unit,
-                keyboardController: SoftwareKeyboardController?)
+                keyboardController: SoftwareKeyboardController?): Message
 {
     keyboardController?.hide()
     val punctuation = listOf('.', '?', '!', ',', ';', ':', '。', '？', '！', '，', '；', '：')
     var text = txt
     if (text.isNotEmpty() && !punctuation.contains(text.last()) && text.last() != '\n') text += "."
-    onMessageSend(
-        Message(
-            text,
-            true,
-            0,
-            type = if (imageUri.value == null) MessageType.TEXT else MessageType.IMAGE,
-            content = imageUri.value
-        )
-    );text = "";imageUri.value = null;onImageSelected(null)
+    var msg = Message(
+        text,
+        true,
+        0,
+        type = if (imageUri.value == null) MessageType.TEXT else MessageType.IMAGE,
+        content = imageUri.value
+    )
+
+    onMessageSend(msg);
+    text = "";imageUri.value = null;onImageSelected(null)
+
+    return msg
 }
 
 
@@ -1757,7 +1846,6 @@ fun RowScope.EntryCard(
                         .size(36.dp),
                 )
             }
-
         }
 
 
@@ -1831,4 +1919,131 @@ fun GreetingPreview() {
     ChatBotTheme {
         Greeting("Android")
     }
+}
+
+fun readCSV(context: Context, filename: String): List<List<String>> {
+    val result = mutableListOf<List<String>>()
+    val inputStream = context.assets.open(filename)
+    val reader = BufferedReader(InputStreamReader(inputStream))
+
+    try {
+        // read csv
+        reader.useLines { lines ->
+            lines.forEach { line ->
+                val values = parseCSVLine(line) // parse csv line and split
+                result.add(values) // In the case of hotpot_qa.csv
+                                   // [[id, question, answer, type, level, supporting_facts, context], ...]
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+
+    return result
+}
+
+fun parseCSVLine(line: String): List<String> {
+    val values = mutableListOf<String>()
+    var current = StringBuilder()
+    var insideQuotes = false
+
+    for (char in line) {
+        when {
+            char == '"' -> {
+                // inside quote o -> internal state change
+                insideQuotes = !insideQuotes
+            }
+            char == ',' && !insideQuotes -> {
+                // comma o && internal x -> field termination
+                values.add(current.toString().trim())
+                current = StringBuilder()
+            }
+            else -> {
+                // add internal string
+                current.append(char)
+            }
+        }
+    }
+    // add last field
+    values.add(current.toString().trim())
+    return values
+}
+
+fun getRecord(path: String, filename: String) : String {
+    // reference type of pid
+    val file = "$path$filename";
+
+    val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "cat $file"))
+    val reader = BufferedReader(InputStreamReader(process.inputStream))
+    val record = reader.use { it.readText() }
+    process.waitFor()
+    return record
+}
+
+fun getHardRecords() : String {
+    // reference type of pid
+    var command = "su -c awk '{print \$1/1000}' /sys/devices/virtual/thermal/thermal_zone*/temp; " + // thermal info
+            "awk '{print \$1/1000}' /sys/kernel/gpu/gpu_min_clock; awk '{print \$1/1000}' /sys/kernel/gpu/gpu_max_clock; " + //gpu clcok
+            // 0, 4, 7) 8 Gen 1 CPU: 1 + 3 + 4 | 7: prime, 4: Gold, 0 Silver
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq; awk '{print \$1/1000}' /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq;" + //cpu0
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq; awk '{print \$1/1000}' /sys/devices/system/cpu/cpu4/cpufreq/scaling_cur_freq;" + //cpu4
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/cpu7/cpufreq/scaling_max_freq; awk '{print \$1/1000}' /sys/devices/system/cpu/cpu7/cpufreq/scaling_cur_freq;" + //cpu7
+            "awk '{print \$2/1024}' /proc/meminfo; " +                // memory info
+            "awk '{print}' /sys/class/power_supply/battery/power_now; " // power consumption
+
+    val process = Runtime.getRuntime().exec(command)
+    val reader = BufferedReader(InputStreamReader(process.inputStream))
+    val record = reader.use { it.readText() }
+    process.waitFor()
+    return record
+}
+
+fun writeRecord(path: String, filename: String, values: ArrayList<ArrayList<String>>){
+    // write
+    // reference type of pid
+    val writefile = File(path, filename);
+
+    val writer = FileWriter(writefile, true); // allow appending
+    writer.use { writer ->
+        values.forEach { row ->
+        writer.write(row.joinToString(", ") + "\n");
+        writer.flush();
+        }
+    }
+}
+
+fun recordProcessing(path: String, file: String, startTime: Long, sigterm: MutableState<Boolean>){
+
+    //Tester Code
+    //while (!sigterm.value) {
+    //    Log.d("CHECKER", "recordProcessing1")
+    //    val power = getRecord("/sys/class/power_supply/battery/", "power_now")
+    //    Log.d("CHECKER", "recordProcessing2: $power")
+    //    Thread.sleep(500)
+    //}
+
+
+    while (!sigterm.value) {
+        //val power = getRecord("/sys/class/power_supply/battery/", "power_now")
+        //val temp = (getRecord("/sys/devices/virtual/thermal/thermal_zone77/", "temp").toDouble()/1000).toString() // convert uC to C
+        val curTimeMillis = (System.currentTimeMillis()-startTime).toString() // ms [unit]
+        val records = getHardRecords()
+        // packing records into one row
+        val record = listOf(curTimeMillis, records.replace("\n", ", "))
+
+        Log.d("CHECKER", "records:$record")
+        //writeRecord("/sdcard/Documents/", "test.txt", records)
+
+        val writefile = File("/sdcard/Documents/", "test.txt");
+        val writer = FileWriter(writefile, true); // allow appending
+        writer.use { writer ->
+            //values.forEach { row ->
+            writer.write(record.joinToString(", ") + "\n");
+            writer.flush();
+            //}
+        }
+        Thread.sleep(170) // 200ms
+    }
+
+    return;
 }
