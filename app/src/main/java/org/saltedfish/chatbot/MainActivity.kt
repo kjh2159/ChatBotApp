@@ -1574,7 +1574,7 @@ fun ChatInput(
     var qa_idx = 0
     // load csv file for hotpot qa
     var qa_lists = readCSV(context = context, filename = "datasets/hotpot_qa.csv")
-    val qa_limit = 5
+    val qa_limit = 10
     var prefill_tot: Double = 0.0
     var decode_tot: Double = 0.0
     var sigterm = mutableStateOf(false)
@@ -1642,9 +1642,9 @@ fun ChatInput(
         TextButton(onClick =  {
             // set clock frequency
             // implementation in 871 - 962 lines
-            //val dvfs = DVFS("S24")
-            val dvfs = DVFS("S22_Ultra")
-            val freqIndices = listOf(10, 10, 10)
+            val dvfs = DVFS("S24")
+            //val dvfs = DVFS("S22_Ultra")
+            val freqIndices = listOf(14, 14, 14, 14)
             dvfs.unsetCPUFrequency(dvfs.clusterIndices)
             dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
             //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(0, 0, 0, 0)) // S24
@@ -1656,7 +1656,7 @@ fun ChatInput(
             //recording start
             val startTime = System.currentTimeMillis()
             CoroutineScope(Dispatchers.IO).launch {
-                recordProcessing("/sdcard/Documents/", "hard_info.txt", startTime, sigterm)
+                recordProcessing("/sdcard/Documents/", "hard_info.txt", startTime, dvfs.clusterIndices, sigterm)
             }
 
             coroutineScope.launch {
@@ -2082,14 +2082,17 @@ fun parseCSVLine(line: String): List<String> {
 }
 
 
-fun getHardRecords() : String {
+fun getHardRecords(clusterIndices: List<Int>) : String {
     // reference type of pid
     var command = "su -c awk '{print \$1/1000}' /sys/devices/virtual/thermal/thermal_zone*/temp; " + // thermal info
-            "awk '{print \$1/1000}' /sys/kernel/gpu/gpu_min_clock; awk '{print \$1/1000}' /sys/kernel/gpu/gpu_max_clock; " + //gpu clcok
-            // 0, 4, 7) 8 Gen 1 CPU: 1 + 3 + 4 | 7: prime, 4: Gold, 0 Silver
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq; awk '{print \$1/1000}' /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq;" + //cpu0
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq; awk '{print \$1/1000}' /sys/devices/system/cpu/cpu4/cpufreq/scaling_cur_freq;" + //cpu4
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/cpu7/cpufreq/scaling_max_freq; awk '{print \$1/1000}' /sys/devices/system/cpu/cpu7/cpufreq/scaling_cur_freq;" + //cpu7
+            "awk '{print \$1/1000}' /sys/kernel/gpu/gpu_min_clock; awk '{print \$1/1000}' /sys/kernel/gpu/gpu_max_clock; " //gpu clcok
+
+    // 0, 4, 7) 8 Gen 1 CPU: 1 + 3 + 4 | 7: prime, 4: Gold, 0 Silver
+    clusterIndices.forEach { index ->
+        command +=  "awk '{print \$1/1000}' /sys/devices/system/cpu/cpu$index/cpufreq/scaling_max_freq; awk '{print \$1/1000}' /sys/devices/system/cpu/cpu$index/cpufreq/scaling_cur_freq;"
+    }
+
+    command = command +
             "awk '{print \$2/1024}' /proc/meminfo; " +                // memory info
             "awk '{print}' /sys/class/power_supply/battery/power_now; " // power consumption
 
@@ -2114,7 +2117,7 @@ fun writeRecord(path: String, filename: String, values: ArrayList<ArrayList<Stri
     }
 }
 
-fun recordProcessing(path: String, file: String, startTime: Long, sigterm: MutableState<Boolean>){
+fun recordProcessing(path: String, file: String, startTime: Long, clusterIndices: List<Int>, sigterm: MutableState<Boolean>){
 
     //Tester Code
     //while (!sigterm.value) {
@@ -2129,7 +2132,7 @@ fun recordProcessing(path: String, file: String, startTime: Long, sigterm: Mutab
         //val power = getRecord("/sys/class/power_supply/battery/", "power_now")
         //val temp = (getRecord("/sys/devices/virtual/thermal/thermal_zone77/", "temp").toDouble()/1000).toString() // convert uC to C
         val curTimeMillis = (System.currentTimeMillis()-startTime).toString() // ms [unit]
-        val records = getHardRecords()
+        val records = getHardRecords(clusterIndices)
         // packing records into one row
         val record = listOf(curTimeMillis, records.replace("\n", ", "))
 
@@ -2144,7 +2147,8 @@ fun recordProcessing(path: String, file: String, startTime: Long, sigterm: Mutab
             writer.flush();
             //}
         }
-        Thread.sleep(170) // 200ms
+        //Thread.sleep(170) // 200ms
+        Thread.sleep(120) // 150ms
     }
 
     return;
