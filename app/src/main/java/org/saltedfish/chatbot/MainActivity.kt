@@ -150,18 +150,23 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.core.content.ContextCompat.startActivity
+import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.runBlocking
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileWriter
 import java.io.InputStreamReader
+import java.lang.Thread.sleep
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.CountDownLatch
-import kotlin.concurrent.thread
 
 fun Context.getActivity(): ComponentActivity? = when (this) {
     is ComponentActivity -> this
@@ -1516,6 +1521,8 @@ fun getBubbleShape(
     }
 }
 
+
+
 @Composable
 fun BoxScope.PreviewBubble(preview: Uri) {
     val density = LocalDensity.current
@@ -1556,6 +1563,50 @@ fun BoxScope.PreviewBubble(preview: Uri) {
     }
 }
 
+fun ShareResult(context: Context) {
+    // 실험 데이터 공유: hard_info.txt
+    var filePath = "/storage/emulated/0/Documents/hard_info.txt"
+//                val file = File("/sdcard/Documents/hard_info.txt")
+    var file = File(filePath)
+    if (file.exists()) {
+        Log.d("test","File exists: $filePath")
+    } else {
+        Log.d("test","File does not exist: $filePath")
+    }
+    var fileUri: Uri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.provider",
+        file
+    )
+    var shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_STREAM, fileUri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(shareIntent, "Share File"))
+
+    // 실험 데이터 공유: infer_info.txt
+    filePath = "/storage/emulated/0/Documents/infer_info.txt"
+//                val file = File("/sdcard/Documents/hard_info.txt")
+    file = File(filePath)
+    if (file.exists()) {
+        Log.d("test","File exists: $filePath")
+    } else {
+        Log.d("test","File does not exist: $filePath")
+    }
+    fileUri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.provider",
+        file
+    )
+    shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_STREAM, fileUri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(shareIntent, "Share File"))
+}
+
 @SuppressLint("UnrememberedMutableState")
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -1574,7 +1625,7 @@ fun ChatInput(
     var qa_idx = 0
     // load csv file for hotpot qa
     var qa_lists = readCSV(context = context, filename = "datasets/hotpot_qa.csv")
-    val qa_limit = 10
+    val qa_limit = 5
     var prefill_tot: Double = 0.0
     var decode_tot: Double = 0.0
     var sigterm = mutableStateOf(false)
@@ -1592,7 +1643,6 @@ fun ChatInput(
             )
         vm.sendMessage(context, msg)
     }
-
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) {
         it?.let {
             imageUri.value = it
@@ -1655,51 +1705,55 @@ fun ChatInput(
 
             //recording start
             val startTime = System.currentTimeMillis()
-            CoroutineScope(Dispatchers.IO).launch {
-                recordProcessing("/sdcard/Documents/", "hard_info.txt", startTime, dvfs.clusterIndices, sigterm)
-            }
+//            runBlocking {
+//                val jobs = listOf (
+                CoroutineScope(Dispatchers.IO).launch {
+                    recordProcessing("/sdcard/Documents/", "hard_info.txt", startTime, dvfs.clusterIndices, sigterm)
 
-            coroutineScope.launch {
-                qa_idx = 1
-                while (qa_idx < qa_limit+1) {
-
-                    if (qa_idx != 1) {
-                        prefill_tot += vm.profilingTime.value!![1] ?: 0.0
-                        decode_tot += vm.profilingTime.value!![2] ?: 0.0
-                    }
-                    vm.isActive.value = true    // inform LLM active: isActive turns false in JNIrun function.
-                    text = qa_lists[qa_idx][1]  //
-                    val temp = arrayListOf((System.currentTimeMillis()-startTime).toString()) // store system time
-                    onSendButtonClicked()
-                    qa_idx++
-//              text = "write"
-//              onSendButtonClicked()
-
-                    while ( vm.isActive.value ){
-                        //Log.e("CHECKER", "Active")
-                        delay(10)
-                        //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(14, 16, 19)) // S22 Ultra
-                        //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(16, 20, 24, 26)) // S24
-                        continue
-                    }
-                    temp.add((vm.profilingTime.value!![1]?:0.0).toString())
-                    temp.add((vm.profilingTime.value!![2]?:0.0).toString())
-                    queryTimes.add(temp) // add system time
-
-                    // activate 1688-1689 if you want to record at every query
-                    writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
-                    queryTimes.clear()
+                    delay(2000)
+                    ShareResult(context)
                 }
+                coroutineScope.launch {
+                    qa_idx = 1
+                    while (qa_idx < qa_limit+1) {
 
-                sigterm.value = true
-                //android.os.Process.killProcess(r_pid.intValue)
-                writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
+                        if (qa_idx != 1) {
+                            prefill_tot += vm.profilingTime.value!![1] ?: 0.0
+                            decode_tot += vm.profilingTime.value!![2] ?: 0.0
+                        }
+                        vm.isActive.value = true    // inform LLM active: isActive turns false in JNIrun function.
+                        text = qa_lists[qa_idx][1]  //
+                        val temp = arrayListOf((System.currentTimeMillis()-startTime).toString()) // store system time
+                        onSendButtonClicked()
+                        qa_idx++
+                        //              text = "write"
+                        //              onSendButtonClicked()
 
-                //Thread.sleep(1000) // for stability
-                //android.os.Process.killProcess(android.os.Process.myPid()) // activate if you want to check experiment termination
-                dvfs.unsetCPUFrequency(dvfs.clusterIndices)
+                        while ( vm.isActive.value ){
+                            //Log.e("CHECKER", "Active")
+                            delay(20)
+                            //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(14, 16, 19)) // S22 Ultra
+                            //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(16, 20, 24, 26)) // S24
+                            continue
+                        }
+                        delay(5)
+                        temp.add((vm.profilingTime.value!![1]?:0.0).toString())
+                        temp.add((vm.profilingTime.value!![2]?:0.0).toString())
+                        queryTimes.add(temp) // add system time
 
-            }
+                        // activate 1688-1689 if you want to record at every query
+                        writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
+                        queryTimes.clear()
+                    }
+
+                    sigterm.value = true
+                    //android.os.Process.killProcess(r_pid.intValue)
+                    writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
+
+                    //Thread.sleep(1000) // for stability
+                    //android.os.Process.killProcess(android.os.Process.myPid()) // activate if you want to check experiment termination
+                    dvfs.unsetCPUFrequency(dvfs.clusterIndices)
+                }
         }) {
             Text(
                 text = "Test",
