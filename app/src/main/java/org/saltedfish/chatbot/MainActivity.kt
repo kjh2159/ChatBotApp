@@ -10,7 +10,6 @@ import android.graphics.Bitmap
 import android.icu.util.Calendar
 import android.media.RingtoneManager
 import android.net.Uri
-import android.os.AsyncTask
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -141,28 +140,19 @@ import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContract
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
-import androidx.core.content.ContextCompat.startActivity
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.runBlocking
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileWriter
 import java.io.InputStreamReader
-import java.lang.Thread.sleep
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -873,41 +863,201 @@ class MainActivity : ComponentActivity() {
 //}
 
 
-open class Device(){
+open class Device() {
     var device: String = ""
     var clusterIndices: List<Int> = emptyList()
 }
 
 class DVFS() : Device() {
-// scaling CPU frequency
-    val cpufreq : Map<String, Map<Int, List<Int>>> = mapOf(
+    // scaling CPU frequency
+    val cpufreq: Map<String, Map<Int, List<Int>>> = mapOf(
         // path: /sys/devices/system/cpu/cpufreq/policy0/scaling_available_frequencies (policy can be 0, 4, 7)
         "S22_Ultra" to mapOf(
             // default: min - max
-            0 to listOf(307200, 403200, 518400,	614400, 729600, 844800, 960000, 1075200, 1171200, 1267200, 1363200, 1478400, 1574400, 1689600, 1785600), // 15
-            4 to listOf(633600, 768000, 883200, 998400, 1113600, 1209600, 1324800, 1440000, 1555200, 1651200, 1766400, 1881600, 1996800, 2112000, 2227200, 2342400, 2419200), // 17
-            7 to listOf(806400, 940800, 1056000, 1171200, 1286400, 1401600, 1497600, 1612800, 1728000, 1843200, 1958400, 2054400, 2169600, 2284800, 2400000, 2515200, 2630400, 2726400, 2822400, 2841600) // 20
+            0 to listOf(
+                307200,
+                403200,
+                518400,
+                614400,
+                729600,
+                844800,
+                960000,
+                1075200,
+                1171200,
+                1267200,
+                1363200,
+                1478400,
+                1574400,
+                1689600,
+                1785600
+            ), // 15
+            4 to listOf(
+                633600,
+                768000,
+                883200,
+                998400,
+                1113600,
+                1209600,
+                1324800,
+                1440000,
+                1555200,
+                1651200,
+                1766400,
+                1881600,
+                1996800,
+                2112000,
+                2227200,
+                2342400,
+                2419200
+            ), // 17
+            7 to listOf(
+                806400,
+                940800,
+                1056000,
+                1171200,
+                1286400,
+                1401600,
+                1497600,
+                1612800,
+                1728000,
+                1843200,
+                1958400,
+                2054400,
+                2169600,
+                2284800,
+                2400000,
+                2515200,
+                2630400,
+                2726400,
+                2822400,
+                2841600
+            ) // 20
         ),
 
         // path: /sys/devices/system/cpu/cpufreq/policy0/scaling_available_frequencies (policy can be 0, 4, 7, 9)
         "S24" to mapOf(
             // default: min - max
-            0 to listOf(400000, 576000, 672000, 768000, 864000, 960000, 1056000, 1152000, 1248000, 1344000, 1440000, 1536000, 1632000, 1728000, 1824000, 1920000, 1959000), // 17
-            4 to listOf(672000, 768000, 864000, 960000, 1056000, 1152000, 1248000, 1344000, 1440000, 1536000, 1632000, 1728000, 1824000, 1920000, 2016000, 2112000, 2208000, 2304000, 2400000, 2496000, 2592000), // 21
-            7 to listOf(672000, 768000, 864000, 960000, 1056000, 1152000, 1248000, 1344000, 1440000, 1536000, 1632000, 1728000, 1824000, 1920000, 2016000, 2112000, 2208000, 2304000, 2400000, 2496000, 2592000, 2688000, 2784000, 2880000, 2900000), // 25
-            9 to listOf(672000, 768000, 864000, 960000, 1056000, 1152000, 1248000, 1344000, 1440000, 1536000, 1632000, 1728000, 1824000, 1920000, 2016000, 2112000, 2208000, 2304000, 2400000, 2496000, 2592000, 2688000, 2784000, 2880000, 2976000, 3072000, 3207000) // 27
+            0 to listOf(
+                400000,
+                576000,
+                672000,
+                768000,
+                864000,
+                960000,
+                1056000,
+                1152000,
+                1248000,
+                1344000,
+                1440000,
+                1536000,
+                1632000,
+                1728000,
+                1824000,
+                1920000,
+                1959000
+            ), // 17
+            4 to listOf(
+                672000,
+                768000,
+                864000,
+                960000,
+                1056000,
+                1152000,
+                1248000,
+                1344000,
+                1440000,
+                1536000,
+                1632000,
+                1728000,
+                1824000,
+                1920000,
+                2016000,
+                2112000,
+                2208000,
+                2304000,
+                2400000,
+                2496000,
+                2592000
+            ), // 21
+            7 to listOf(
+                672000,
+                768000,
+                864000,
+                960000,
+                1056000,
+                1152000,
+                1248000,
+                1344000,
+                1440000,
+                1536000,
+                1632000,
+                1728000,
+                1824000,
+                1920000,
+                2016000,
+                2112000,
+                2208000,
+                2304000,
+                2400000,
+                2496000,
+                2592000,
+                2688000,
+                2784000,
+                2880000,
+                2900000
+            ), // 25
+            9 to listOf(
+                672000,
+                768000,
+                864000,
+                960000,
+                1056000,
+                1152000,
+                1248000,
+                1344000,
+                1440000,
+                1536000,
+                1632000,
+                1728000,
+                1824000,
+                1920000,
+                2016000,
+                2112000,
+                2208000,
+                2304000,
+                2400000,
+                2496000,
+                2592000,
+                2688000,
+                2784000,
+                2880000,
+                2976000,
+                3072000,
+                3207000
+            ) // 27
         )
     )
+    val emptyThermal: Map<String, List<String>> = mapOf("S22_Ultra" to
+            listOf("sdr0-pa0",
+            "sdr1-pa0",
+            "pm8350b_tz",
+            "pm8350b-ibat-lvl0",
+            "pm8350b-ibat-lvl1",
+            "pm8350b-bcl-lvl0",
+            "pm8350b-bcl-lvl1",
+            "pm8350b-bcl-lvl2",
+            "socd",
+            "pmr735b_tz"))
 
     constructor(device: String) : this() {
         this.device = device
-        when(device){
+        when (device) {
             "S22_Ultra" -> clusterIndices = listOf(0, 4, 7)
             "S24" -> clusterIndices = listOf(0, 4, 7, 9)
         }
     }
 
-    fun setCPUFrequency(clusterIndices: List<Int>, freqIndices: List<Int>){
+    fun setCPUFrequency(clusterIndices: List<Int>, freqIndices: List<Int>) {
         // clusterIndices: list of cpu core indices
         // policyIndices: list of indices of frequency which the cluster will have from the frequency lists
         // ex) freq = {0: [1000, 2000, 3000], 4: [2000, 3000, 4000]]
@@ -919,17 +1069,19 @@ class DVFS() : Device() {
         // /sys/devices/system/cpu/cpufreq/policy<N>/scaling_max_freq
         // /sys/devices/system/cpu/cpufreq/policy<N>/scaling_min_freq
 
-        if (clusterIndices.size != freqIndices.size) {  return  }
+        if (clusterIndices.size != freqIndices.size) {
+            return
+        }
 
         var freqs = cpufreq[device] // available frequencies for the device
         var command = "su -c "      // make a command
 
-        for(i:Int in 0..clusterIndices.size-1){
+        for (i: Int in 0..clusterIndices.size - 1) {
             var temp = freqs?.get(clusterIndices[i])?.get(freqIndices[i])
             var idx = clusterIndices[i]
             //Log.d("CHECKER", temp.toString())
             command += "echo $temp > /sys/devices/system/cpu/cpufreq/policy$idx/scaling_max_freq; " +
-                       "echo $temp > /sys/devices/system/cpu/cpufreq/policy$idx/scaling_min_freq; "
+                    "echo $temp > /sys/devices/system/cpu/cpufreq/policy$idx/scaling_min_freq; "
         }
 
         // run android kernel command
@@ -937,19 +1089,20 @@ class DVFS() : Device() {
         process.waitFor()
     }
 
-    fun unsetCPUFrequency(clusterIndices: List<Int>){
+    fun unsetCPUFrequency(clusterIndices: List<Int>) {
         // set all clusters' frequencies as min and max
 
         var freqs = cpufreq[device] // available frequencies for the device
         var command = "su -c "      // make a command
 
-        for(i:Int in 0..clusterIndices.size-1){
+        for (i: Int in 0..clusterIndices.size - 1) {
             val min_freq = freqs?.get(clusterIndices[i])?.get(0) // available max frequency
-            val max_freq = freqs?.get(clusterIndices[i])?.get(freqs[clusterIndices[i]]!!.size - 1) // available min frequency
+            val max_freq = freqs?.get(clusterIndices[i])
+                ?.get(freqs[clusterIndices[i]]!!.size - 1) // available min frequency
             val idx = clusterIndices[i] // cluster id
             Log.d("CHECKER", "max: $max_freq | min: $min_freq")
             command += "echo $max_freq > /sys/devices/system/cpu/cpufreq/policy$idx/scaling_max_freq; " +
-                       "echo $min_freq > /sys/devices/system/cpu/cpufreq/policy$idx/scaling_min_freq; "
+                    "echo $min_freq > /sys/devices/system/cpu/cpufreq/policy$idx/scaling_min_freq; "
         }
 
         // run android kernel command
@@ -962,8 +1115,6 @@ class DVFS() : Device() {
         return this.cpufreq[this.device]?.get(idx)
     }
 }
-
-
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -1350,7 +1501,7 @@ fun Chat(
                 Text(
                     text = "Chat", fontWeight = FontWeight.Bold, fontSize = 24.sp
                 )
-            }, navigationIcon =  {
+            }, navigationIcon = {
                 IconButton(onClick = { navController.popBackStack() }) {
                     Icon(Icons.Rounded.ArrowBack, contentDescription = "Back")
                 }
@@ -1393,11 +1544,16 @@ fun Chat(
             if (vm.profilingTime.value != null && vm.profilingTime.value?.size!! > 0) Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                , horizontalArrangement = Arrangement.Center
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                horizontalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "Prefill: ${String.format("%.2f",vm.profilingTime.value!![1])}Tok/s, Decode: ${String.format("%.2f",vm.profilingTime.value!![2])}Tok/s",
+                    text = "Prefill: ${
+                        String.format(
+                            "%.2f",
+                            vm.profilingTime.value!![1]
+                        )
+                    }Tok/s, Decode: ${String.format("%.2f", vm.profilingTime.value!![2])}Tok/s",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
 //                    center
@@ -1522,7 +1678,6 @@ fun getBubbleShape(
 }
 
 
-
 @Composable
 fun BoxScope.PreviewBubble(preview: Uri) {
     val density = LocalDensity.current
@@ -1569,9 +1724,9 @@ fun ShareResult(context: Context) {
 //                val file = File("/sdcard/Documents/hard_info.txt")
     var file = File(filePath)
     if (file.exists()) {
-        Log.d("test","File exists: $filePath")
+        Log.d("test", "File exists: $filePath")
     } else {
-        Log.d("test","File does not exist: $filePath")
+        Log.d("test", "File does not exist: $filePath")
     }
     var fileUri: Uri = FileProvider.getUriForFile(
         context,
@@ -1590,9 +1745,9 @@ fun ShareResult(context: Context) {
 //                val file = File("/sdcard/Documents/hard_info.txt")
     file = File(filePath)
     if (file.exists()) {
-        Log.d("test","File exists: $filePath")
+        Log.d("test", "File exists: $filePath")
     } else {
-        Log.d("test","File does not exist: $filePath")
+        Log.d("test", "File does not exist: $filePath")
     }
     fileUri = FileProvider.getUriForFile(
         context,
@@ -1625,7 +1780,7 @@ fun ChatInput(
     var qa_idx = 0
     // load csv file for hotpot qa
     var qa_lists = readCSV(context = context, filename = "datasets/hotpot_qa.csv")
-    val qa_limit = 5
+    val qa_limit = 2
     var prefill_tot: Double = 0.0
     var decode_tot: Double = 0.0
     var sigterm = mutableStateOf(false)
@@ -1635,12 +1790,12 @@ fun ChatInput(
     val keyboardController = LocalSoftwareKeyboardController.current
     val onSendButtonClicked: () -> Unit = { // pj custom
         var msg = performSend(
-                    txt = text,
-                    imageUri = imageUri,
-                    onImageSelected = onImageSelected,
-                    onMessageSend = onMessageSend,
-                    keyboardController = keyboardController
-            )
+            txt = text,
+            imageUri = imageUri,
+            onImageSelected = onImageSelected,
+            onMessageSend = onMessageSend,
+            keyboardController = keyboardController
+        )
         vm.sendMessage(context, msg)
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) {
@@ -1689,11 +1844,11 @@ fun ChatInput(
                 Modifier.size(36.dp)
             )
         }
-        TextButton(onClick =  {
+        TextButton(onClick = {
             // set clock frequency
             // implementation in 871 - 962 lines
-            val dvfs = DVFS("S24")
-            //val dvfs = DVFS("S22_Ultra")
+//            val dvfs = DVFS("S24")
+            val dvfs = DVFS("S22_Ultra")
             val freqIndices = listOf(14, 14, 14, 14)
             dvfs.unsetCPUFrequency(dvfs.clusterIndices)
             dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
@@ -1707,53 +1862,62 @@ fun ChatInput(
             val startTime = System.currentTimeMillis()
 //            runBlocking {
 //                val jobs = listOf (
-                CoroutineScope(Dispatchers.IO).launch {
-                    recordProcessing("/sdcard/Documents/", "hard_info.txt", startTime, dvfs.clusterIndices, sigterm)
+            CoroutineScope(Dispatchers.IO).launch {
+                recordProcessing(
+                    "/sdcard/Documents/",
+                    "hard_info.txt",
+                    startTime,
+                    dvfs.clusterIndices,
+                    dvfs.emptyThermal[dvfs.device],
+                    sigterm
+                )
 
-                    delay(2000)
-                    ShareResult(context)
-                }
-                coroutineScope.launch {
-                    qa_idx = 1
-                    while (qa_idx < qa_limit+1) {
+                delay(2000)
+                ShareResult(context)
+            }
+            coroutineScope.launch {
+                qa_idx = 1
+                while (qa_idx < qa_limit + 1) {
 
-                        if (qa_idx != 1) {
-                            prefill_tot += vm.profilingTime.value!![1] ?: 0.0
-                            decode_tot += vm.profilingTime.value!![2] ?: 0.0
-                        }
-                        vm.isActive.value = true    // inform LLM active: isActive turns false in JNIrun function.
-                        text = qa_lists[qa_idx][1]  //
-                        val temp = arrayListOf((System.currentTimeMillis()-startTime).toString()) // store system time
-                        onSendButtonClicked()
-                        qa_idx++
-                        //              text = "write"
-                        //              onSendButtonClicked()
-
-                        while ( vm.isActive.value ){
-                            //Log.e("CHECKER", "Active")
-                            delay(20)
-                            //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(14, 16, 19)) // S22 Ultra
-                            //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(16, 20, 24, 26)) // S24
-                            continue
-                        }
-                        delay(5)
-                        temp.add((vm.profilingTime.value!![1]?:0.0).toString())
-                        temp.add((vm.profilingTime.value!![2]?:0.0).toString())
-                        queryTimes.add(temp) // add system time
-
-                        // activate 1688-1689 if you want to record at every query
-                        writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
-                        queryTimes.clear()
+                    if (qa_idx != 1) {
+                        prefill_tot += vm.profilingTime.value!![1] ?: 0.0
+                        decode_tot += vm.profilingTime.value!![2] ?: 0.0
                     }
+                    vm.isActive.value =
+                        true    // inform LLM active: isActive turns false in JNIrun function.
+                    text = qa_lists[qa_idx][1]  //
+                    val temp =
+                        arrayListOf((System.currentTimeMillis() - startTime).toString()) // store system time
+                    onSendButtonClicked()
+                    qa_idx++
+                    //              text = "write"
+                    //              onSendButtonClicked()
 
-                    sigterm.value = true
-                    //android.os.Process.killProcess(r_pid.intValue)
+                    while (vm.isActive.value) {
+                        //Log.e("CHECKER", "Active")
+                        delay(20)
+                        //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(14, 16, 19)) // S22 Ultra
+                        //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(16, 20, 24, 26)) // S24
+                        continue
+                    }
+                    delay(5)
+                    temp.add((vm.profilingTime.value!![1] ?: 0.0).toString())
+                    temp.add((vm.profilingTime.value!![2] ?: 0.0).toString())
+                    queryTimes.add(temp) // add system time
+
+                    // activate 1688-1689 if you want to record at every query
                     writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
-
-                    //Thread.sleep(1000) // for stability
-                    //android.os.Process.killProcess(android.os.Process.myPid()) // activate if you want to check experiment termination
-                    dvfs.unsetCPUFrequency(dvfs.clusterIndices)
+                    queryTimes.clear()
                 }
+
+                sigterm.value = true
+                //android.os.Process.killProcess(r_pid.intValue)
+                writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
+
+                //Thread.sleep(1000) // for stability
+                //android.os.Process.killProcess(android.os.Process.myPid()) // activate if you want to check experiment termination
+                dvfs.unsetCPUFrequency(dvfs.clusterIndices)
+            }
         }) {
             Text(
                 text = "Test",
@@ -1769,12 +1933,13 @@ fun ChatInput(
 
 }
 
-fun performSend(txt: String,
-                imageUri: MutableState<Uri?>,
-                onImageSelected: (Uri?) -> Unit,
-                onMessageSend: (Message) -> Unit,
-                keyboardController: SoftwareKeyboardController?): Message
-{
+fun performSend(
+    txt: String,
+    imageUri: MutableState<Uri?>,
+    onImageSelected: (Uri?) -> Unit,
+    onMessageSend: (Message) -> Unit,
+    keyboardController: SoftwareKeyboardController?
+): Message {
     keyboardController?.hide()
     val punctuation = listOf('.', '?', '!', ',', ';', ':', '。', '？', '！', '，', '；', '：')
     var text = txt
@@ -2098,7 +2263,7 @@ fun readCSV(context: Context, filename: String): List<List<String>> {
             lines.forEach { line ->
                 val values = parseCSVLine(line) // parse csv line and split
                 result.add(values) // In the case of hotpot_qa.csv
-                                   // [[id, question, answer, type, level, supporting_facts, context], ...]
+                // [[id, question, answer, type, level, supporting_facts, context], ...]
             }
         }
     } catch (e: Exception) {
@@ -2119,11 +2284,13 @@ fun parseCSVLine(line: String): List<String> {
                 // inside quote o -> internal state change
                 insideQuotes = !insideQuotes
             }
+
             char == ',' && !insideQuotes -> {
                 // comma o && internal x -> field termination
                 values.add(current.toString().trim())
                 current = StringBuilder()
             }
+
             else -> {
                 // add internal string
                 current.append(char)
@@ -2135,17 +2302,55 @@ fun parseCSVLine(line: String): List<String> {
     return values
 }
 
-
-fun getHardRecords(clusterIndices: List<Int>) : String {
+fun getRecordsName(clusterIndices: List<Int>, emptyThermal: List<String>?): String {
+    var names = "Time,"
     // reference type of pid
-    var command = "su -c awk '{print \$1/1000}' /sys/devices/virtual/thermal/thermal_zone*/temp; " + // thermal info
-            "awk '{print \$1/1000}' /sys/kernel/gpu/gpu_min_clock; awk '{print \$1/1000}' /sys/kernel/gpu/gpu_max_clock; " //gpu clcok
+    var command = "su -c cat /sys/devices/virtual/thermal/thermal_zone*/type"
+    val process = Runtime.getRuntime().exec(command)
+    val reader = BufferedReader(InputStreamReader(process.inputStream))
+    val tempRecord = reader.use { it.readText() }
+    process.waitFor()
+
+    names += tempRecord.replace("\n", ",")
+    names += "gpu_min_clock,gpu_max_clock,"
 
     // 0, 4, 7) 8 Gen 1 CPU: 1 + 3 + 4 | 7: prime, 4: Gold, 0 Silver
     clusterIndices.forEach { index ->
-        command +=  "awk '{print \$1/1000}' /sys/devices/system/cpu/cpu$index/cpufreq/scaling_max_freq; awk '{print \$1/1000}' /sys/devices/system/cpu/cpu$index/cpufreq/scaling_cur_freq;"
+        names += "cpu$index"+"_max_freq, cpu$index" + "_cur_freq,"
     }
+//
+    command = "su -c awk '{print \$1}' /proc/meminfo"
+    val process2 = Runtime.getRuntime().exec(command)
+    val reader2 = BufferedReader(InputStreamReader(process2.inputStream))
+    val tempRecord2 = reader2.use { it.readText() }
+    process2.waitFor()
 
+    names += tempRecord2.replace("\n", ",")
+    names += "power_now,"
+
+    Log.d("TEST", "names: $names")
+    Log.d("TEST", "emptyThermal: $emptyThermal")
+
+    if (emptyThermal != null) {
+        for (empty in emptyThermal) {
+            names = names.replace("$empty,", "")
+        }
+    }
+    Log.d("TEST", "names: $names")
+    return names
+}
+
+fun getHardRecords(clusterIndices: List<Int>): String {
+    // reference type of pid
+    var command =
+        "su -c awk '{print \$1/1000}' /sys/devices/virtual/thermal/thermal_zone*/temp; " + // thermal info
+                "awk '{print \$1}' /sys/kernel/gpu/gpu_min_clock; awk '{print \$1}' /sys/kernel/gpu/gpu_max_clock; " //gpu clock
+
+    // 0, 4, 7) 8 Gen 1 CPU: 1 + 3 + 4 | 7: prime, 4: Gold, 0 Silver
+    clusterIndices.forEach { index ->
+        command += "awk '{print \$1/1000}' /sys/devices/system/cpu/cpu$index/cpufreq/scaling_max_freq; awk '{print \$1/1000}' /sys/devices/system/cpu/cpu$index/cpufreq/scaling_cur_freq;"
+    }
+//
     command = command +
             "awk '{print \$2/1024}' /proc/meminfo; " +                // memory info
             "awk '{print}' /sys/class/power_supply/battery/power_now; " // power consumption
@@ -2157,7 +2362,7 @@ fun getHardRecords(clusterIndices: List<Int>) : String {
     return record
 }
 
-fun writeRecord(path: String, filename: String, values: ArrayList<ArrayList<String>>){
+fun writeRecord(path: String, filename: String, values: ArrayList<ArrayList<String>>) {
     // write
     // reference type of pid
     val writefile = File(path, filename);
@@ -2165,13 +2370,20 @@ fun writeRecord(path: String, filename: String, values: ArrayList<ArrayList<Stri
     val writer = FileWriter(writefile, true); // allow appending
     writer.use { writer ->
         values.forEach { row ->
-        writer.write(row.joinToString(", ") + "\n");
-        writer.flush();
+            writer.write(row.joinToString(", ") + "\n");
+            writer.flush();
         }
     }
 }
 
-fun recordProcessing(path: String, file: String, startTime: Long, clusterIndices: List<Int>, sigterm: MutableState<Boolean>){
+fun recordProcessing(
+    path: String,
+    file: String,
+    startTime: Long,
+    clusterIndices: List<Int>,
+    emptyThermal: List<String>?,
+    sigterm: MutableState<Boolean>
+) {
 
     //Tester Code
     //while (!sigterm.value) {
@@ -2180,12 +2392,21 @@ fun recordProcessing(path: String, file: String, startTime: Long, clusterIndices
     //    Log.d("CHECKER", "recordProcessing2: $power")
     //    Thread.sleep(500)
     //}
+    val names = getRecordsName(clusterIndices, emptyThermal)
+    var writefile = File(path, file);
+    var writer = FileWriter(writefile); // allow appending
+    writer.use { writer ->
+        //values.forEach { row ->
+        writer.write(names + "\n");
+        writer.flush();
+        //}
+    }
 
 
     while (!sigterm.value) {
         //val power = getRecord("/sys/class/power_supply/battery/", "power_now")
         //val temp = (getRecord("/sys/devices/virtual/thermal/thermal_zone77/", "temp").toDouble()/1000).toString() // convert uC to C
-        val curTimeMillis = (System.currentTimeMillis()-startTime).toString() // ms [unit]
+        val curTimeMillis = (System.currentTimeMillis() - startTime).toString() // ms [unit]
         val records = getHardRecords(clusterIndices)
         // packing records into one row
         val record = listOf(curTimeMillis, records.replace("\n", ", "))
@@ -2193,8 +2414,8 @@ fun recordProcessing(path: String, file: String, startTime: Long, clusterIndices
         Log.d("CHECKER", "records:$record")
         //writeRecord("/sdcard/Documents/", "test.txt", records)
 
-        val writefile = File(path, file);
-        val writer = FileWriter(writefile, true); // allow appending
+        writefile = File(path, file);
+        writer = FileWriter(writefile, true); // allow appending
         writer.use { writer ->
             //values.forEach { row ->
             writer.write(record.joinToString(", ") + "\n");
