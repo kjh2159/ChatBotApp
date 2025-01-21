@@ -1049,6 +1049,11 @@ class DVFS() : Device() {
             "socd",
             "pmr735b_tz"))
 
+    val ddrfreq : Map<String, List<Int>> = mapOf(
+        "S22_Ultra" to listOf(547000, 768000, 1555000, 1708000, 2092000, 2736000, 3196000), // 7 levels
+        "S24" to listOf()
+    )
+
     constructor(device: String) : this() {
         this.device = device
         when (device) {
@@ -1114,6 +1119,67 @@ class DVFS() : Device() {
         // idx = 0 .. 3
         return this.cpufreq[this.device]?.get(idx)
     }
+
+    fun setRAMFrequency(freqIndex: Int){
+        // freqIndex: index of frequency to set
+        // then, freqIndex 0 -> 547000kHz
+
+        // path to set RAM clock frequency
+        // /sys/devices/system/cpu/bus_dcvs/DDR/
+        val freqs = ddrfreq[device]
+        var command = "su -c "
+        if (freqIndex > freqs?.size!!) {  return  }
+
+        // S22 Ultra version (need to check S24)
+        val freq = freqs[freqIndex]
+        command += "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/max_freq; "+
+                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/min_freq; "+
+                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/max_freq; "+
+                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/min_freq; "+
+                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/max_freq; "+
+                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/min_freq; "+
+                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/max_freq; "+
+                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/min_freq; "+
+                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/max_freq; "+
+                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/min_freq; "+
+                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/max_freq; "+
+                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/min_freq; "
+
+        // run android kernel command
+        val process = Runtime.getRuntime().exec(command)
+        process.waitFor()
+    }
+
+    fun unsetRAMFrequency(){
+        // freqIndex: index of frequency to set
+        // then, freqIndex 0 -> 547000kHz
+
+        // path to set RAM clock frequency
+        // /sys/devices/system/cpu/bus_dcvs/DDR/
+        val freqs = ddrfreq[device]
+        val max_freq = freqs?.get(freqs.size-1)
+        val min_freq = freqs?.get(0)
+        // S22 Ultra version (need to check S24)
+        val command = "su -c "+
+                "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/max_freq; "+
+                "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/min_freq; "+
+                "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/max_freq; "+
+                "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/min_freq; "+
+                "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/max_freq; "+
+                "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/min_freq; "+
+                "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/max_freq; "+
+                "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/min_freq; "+
+                "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/max_freq; "+
+                "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/min_freq; "+
+                "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/max_freq; "+
+                "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/min_freq; "
+
+        // run android kernel command
+        val process = Runtime.getRuntime().exec(command)
+        process.waitFor()
+    }
+
+
 }
 
 
@@ -1851,8 +1917,11 @@ fun ChatInput(
             val dvfs = DVFS("S22_Ultra")
             val freqIndices = listOf(14, 14, 14, 14)
             dvfs.unsetCPUFrequency(dvfs.clusterIndices)
-            dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
+            //dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
             //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(0, 0, 0, 0)) // S24
+
+            // RAM DVFS
+            dvfs.setRAMFrequency(0)
 
 
             // for hotpot_qa
@@ -1917,6 +1986,7 @@ fun ChatInput(
                 //Thread.sleep(1000) // for stability
                 //android.os.Process.killProcess(android.os.Process.myPid()) // activate if you want to check experiment termination
                 dvfs.unsetCPUFrequency(dvfs.clusterIndices)
+                dvfs.unsetRAMFrequency()
             }
         }) {
             Text(
