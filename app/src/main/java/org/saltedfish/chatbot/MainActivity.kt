@@ -1037,17 +1037,19 @@ class DVFS() : Device() {
             ) // 27
         )
     )
-    val emptyThermal: Map<String, List<String>> = mapOf("S22_Ultra" to
-            listOf("sdr0-pa0",
-            "sdr1-pa0",
-            "pm8350b_tz",
-            "pm8350b-ibat-lvl0",
-            "pm8350b-ibat-lvl1",
-            "pm8350b-bcl-lvl0",
-            "pm8350b-bcl-lvl1",
-            "pm8350b-bcl-lvl2",
-            "socd",
-            "pmr735b_tz"))
+    val emptyThermal: Map<String, List<String>> = mapOf(
+        "S22_Ultra" to
+                listOf("sdr0-pa0",
+                    "sdr1-pa0",
+                    "pm8350b_tz",
+                    "pm8350b-ibat-lvl0",
+                    "pm8350b-ibat-lvl1",
+                    "pm8350b-bcl-lvl0",
+                    "pm8350b-bcl-lvl1",
+                    "pm8350b-bcl-lvl2",
+                    "socd",
+                    "pmr735b_tz"),
+        )
 
     val ddrfreq : Map<String, List<Int>> = mapOf(
         "S22_Ultra" to listOf(547000, 768000, 1555000, 1708000, 2092000, 2736000, 3196000), // 7 levels
@@ -1929,6 +1931,18 @@ fun ChatInput(
 
             //recording start
             val startTime = System.currentTimeMillis()
+
+            // infer_info 초기화
+            var path = "/sdcard/Documents/"
+            var file = "infer_info.txt"
+            var writefile = File(path, file);
+            var writer = FileWriter(writefile);
+            writer.use { writer ->
+                //values.forEach { row ->
+                writer.write("time,prefill,decode"+ "\n");
+                writer.flush();
+                //}
+            }
 //            runBlocking {
 //                val jobs = listOf (
             CoroutineScope(Dispatchers.IO).launch {
@@ -1944,8 +1958,11 @@ fun ChatInput(
                 delay(2000)
                 ShareResult(context)
             }
+
             coroutineScope.launch {
                 qa_idx = 1
+
+
                 while (qa_idx < qa_limit + 1) {
 
                     if (qa_idx != 1) {
@@ -1956,7 +1973,7 @@ fun ChatInput(
                         true    // inform LLM active: isActive turns false in JNIrun function.
                     text = qa_lists[qa_idx][1]  //
                     val temp =
-                        arrayListOf((System.currentTimeMillis() - startTime).toString()) // store system time
+                        arrayListOf(((System.currentTimeMillis() - startTime)/1000.0).toString()) // store system time
                     onSendButtonClicked()
                     qa_idx++
                     //              text = "write"
@@ -2396,7 +2413,7 @@ fun getRecordsName(clusterIndices: List<Int>, emptyThermal: List<String>?): Stri
     process2.waitFor()
 
     names += tempRecord2.replace("\n", ",")
-    names += "power_now,"
+    names += "power_now,prime_max_freq,prime_min_freq,prime-latfloor_max_freq,prime-latfloor_min_freq,gold_max_freq,gold_min_freq,gold-compute_max_freq,gold-compute_min_freq,silver_max_freq,silver_min_freq,bwmon-ddr_max_freq,bwmon-ddr_min_freq,"
 
     Log.d("TEST", "names: $names")
     Log.d("TEST", "emptyThermal: $emptyThermal")
@@ -2420,10 +2437,24 @@ fun getHardRecords(clusterIndices: List<Int>): String {
     clusterIndices.forEach { index ->
         command += "awk '{print \$1/1000}' /sys/devices/system/cpu/cpu$index/cpufreq/scaling_max_freq; awk '{print \$1/1000}' /sys/devices/system/cpu/cpu$index/cpufreq/scaling_cur_freq;"
     }
-//
+
     command = command +
             "awk '{print \$2/1024}' /proc/meminfo; " +                // memory info
             "awk '{print}' /sys/class/power_supply/battery/power_now; " // power consumption
+
+    // Memory clock
+    command = command + "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/max_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/min_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/max_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/min_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/max_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/min_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/max_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/min_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/max_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/min_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/max_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/min_freq; "
 
     val process = Runtime.getRuntime().exec(command)
     val reader = BufferedReader(InputStreamReader(process.inputStream))
@@ -2464,7 +2495,7 @@ fun recordProcessing(
     //}
     val names = getRecordsName(clusterIndices, emptyThermal)
     var writefile = File(path, file);
-    var writer = FileWriter(writefile); // allow appending
+    var writer = FileWriter(writefile);
     writer.use { writer ->
         //values.forEach { row ->
         writer.write(names + "\n");
@@ -2476,7 +2507,7 @@ fun recordProcessing(
     while (!sigterm.value) {
         //val power = getRecord("/sys/class/power_supply/battery/", "power_now")
         //val temp = (getRecord("/sys/devices/virtual/thermal/thermal_zone77/", "temp").toDouble()/1000).toString() // convert uC to C
-        val curTimeMillis = (System.currentTimeMillis() - startTime).toString() // ms [unit]
+        val curTimeMillis = ((System.currentTimeMillis() - startTime)/1000.0).toString() // ms [unit]
         val records = getHardRecords(clusterIndices)
         // packing records into one row
         val record = listOf(curTimeMillis, records.replace("\n", ", "))
