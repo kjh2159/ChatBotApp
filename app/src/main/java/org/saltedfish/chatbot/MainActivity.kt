@@ -1848,7 +1848,7 @@ fun ChatInput(
     var qa_idx = 0
     // load csv file for hotpot qa
     var qa_lists = readCSV(context = context, filename = "datasets/hotpot_qa.csv")
-    val qa_limit = 2
+    val qa_limit = 4
     var prefill_tot: Double = 0.0
     var decode_tot: Double = 0.0
     var sigterm = mutableStateOf(false)
@@ -1917,13 +1917,13 @@ fun ChatInput(
             // implementation in 871 - 962 lines
 //            val dvfs = DVFS("S24")
             val dvfs = DVFS("S22_Ultra")
-            val freqIndices = listOf(14, 14, 14, 14)
+            val freqIndices = listOf(6,6,6)
             dvfs.unsetCPUFrequency(dvfs.clusterIndices)
-            //dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
+            dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra ~14, ~16, ~19
             //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(0, 0, 0, 0)) // S24
 
             // RAM DVFS
-            dvfs.setRAMFrequency(0)
+//            dvfs.setRAMFrequency(4)  // S22 Ultra ~6
 
 
             // for hotpot_qa
@@ -2413,7 +2413,7 @@ fun getRecordsName(clusterIndices: List<Int>, emptyThermal: List<String>?): Stri
     process2.waitFor()
 
     names += tempRecord2.replace("\n", ",")
-    names += "power_now,prime_max_freq,prime_min_freq,prime-latfloor_max_freq,prime-latfloor_min_freq,gold_max_freq,gold_min_freq,gold-compute_max_freq,gold-compute_min_freq,silver_max_freq,silver_min_freq,bwmon-ddr_max_freq,bwmon-ddr_min_freq,"
+    names += "power_now,prime_max_freq,prime_min_freq,prime_cur_freq,prime-latfloor_max_freq,prime-latfloor_min_freq,prime-latfloor_cur_freq,gold_max_freq,gold_min_freq,gold_cur_freq,gold-compute_max_freq,gold-compute_min_freq,gold-compute_cur_freq,silver_max_freq,silver_min_freq,silver_cur_freq,bwmon-ddr_max_freq,bwmon-ddr_min_freq,bwmon-ddr_cur_freq,"
 
     Log.d("TEST", "names: $names")
     Log.d("TEST", "emptyThermal: $emptyThermal")
@@ -2445,16 +2445,22 @@ fun getHardRecords(clusterIndices: List<Int>): String {
     // Memory clock
     command = command + "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/max_freq; "+
             "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/min_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/cur_freq; "+
             "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/max_freq; "+
             "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/min_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/cur_freq; "+
             "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/max_freq; "+
             "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/min_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/cur_freq; "+
             "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/max_freq; "+
             "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/min_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/cur_freq; "+
             "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/max_freq; "+
             "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/min_freq; "+
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/cur_freq; "+
             "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/max_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/min_freq; "
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/min_freq; " +
+            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/cur_freq; "
 
     val process = Runtime.getRuntime().exec(command)
     val reader = BufferedReader(InputStreamReader(process.inputStream))
