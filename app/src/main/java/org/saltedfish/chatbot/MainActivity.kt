@@ -1861,7 +1861,7 @@ fun ChatInput(
     var qa_idx = 0
     // load csv file for hotpot qa
     var qa_lists = readCSV(context = context, filename = "datasets/hotpot_qa.csv")
-    val qa_limit = 2
+    val qa_limit = 20
     var prefill_tot: Double = 0.0
     var decode_tot: Double = 0.0
     var sigterm = mutableStateOf(false)
@@ -1930,22 +1930,22 @@ fun ChatInput(
             // implementation in 871 - 962 lines
 
             // S24 (Exynos 2400)
-            val dvfs = DVFS("S24")
-            val freqIndices = listOf(6, 6, 6, 6)
+            //val dvfs = DVFS("S24")
+            //val freqIndices = listOf(6, 6, 6, 6)
 
             // S22 Ultra (Snapdragon 8 Gen 1)
             //val dvfs = DVFS("S22_Ultra")
             //val freqIndices = listOf(10, 10, 10)
 
-            dvfs.unsetCPUFrequency(dvfs.clusterIndices)
+            //dvfs.unsetCPUFrequency(dvfs.clusterIndices)
             //dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
             //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(0, 0, 0, 0)) // S24
 
             // RAM DVFS
             // (S22 Ultra) 547000 768000 1555000 1708000 2092000 2736000 3196000
             // (S24) 421000 676000 845000 1014000 1352000 1539000 1716000 2028000 2288000 2730000 3172000 3738000 4206000
-            dvfs.setRAMFrequency(0)
-            Thread.sleep(100) // to stabilize
+            //dvfs.setRAMFrequency(0)
+            //Thread.sleep(100) // to stabilize
 
 
 
@@ -1956,19 +1956,19 @@ fun ChatInput(
             val startTime = System.currentTimeMillis()
 //            runBlocking {
 //                val jobs = listOf (
-            CoroutineScope(Dispatchers.IO).launch {
-                recordProcessing(
-                    "/sdcard/Documents/",
-                    "hard_info.txt",
-                    startTime,
-                    dvfs.clusterIndices,
-                    dvfs.emptyThermal[dvfs.device],
-                    sigterm
-                )
-
-                delay(2000)
-                ShareResult(context)
-            }
+//            CoroutineScope(Dispatchers.IO).launch {
+//                recordProcessing(
+//                    "/sdcard/Documents/",
+//                    "hard_info.txt",
+//                    startTime,
+//                    dvfs.clusterIndices,
+//                    dvfs.emptyThermal[dvfs.device],
+//                    sigterm
+//                )
+//
+//                delay(2000)
+//                ShareResult(context)
+//            }
             coroutineScope.launch {
                 qa_idx = 1
                 while (qa_idx < qa_limit + 1) {
@@ -2000,18 +2000,18 @@ fun ChatInput(
                     queryTimes.add(temp) // add system time
 
                     // activate 1688-1689 if you want to record at every query
-                    writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
-                    queryTimes.clear()
+//                    writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
+//                    queryTimes.clear()
                 }
 
                 sigterm.value = true
                 //android.os.Process.killProcess(r_pid.intValue)
-                writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
+//                writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
 
                 //Thread.sleep(1000) // for stability
                 //android.os.Process.killProcess(android.os.Process.myPid()) // activate if you want to check experiment termination
-                dvfs.unsetCPUFrequency(dvfs.clusterIndices)
-                dvfs.unsetRAMFrequency()
+//                dvfs.unsetCPUFrequency(dvfs.clusterIndices)
+//                dvfs.unsetRAMFrequency()
             }
         }) {
             Text(
