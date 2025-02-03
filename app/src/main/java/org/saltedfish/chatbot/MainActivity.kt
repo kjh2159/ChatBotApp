@@ -1037,23 +1037,21 @@ class DVFS() : Device() {
             ) // 27
         )
     )
-    val emptyThermal: Map<String, List<String>> = mapOf(
-        "S22_Ultra" to
-                listOf("sdr0-pa0",
-                    "sdr1-pa0",
-                    "pm8350b_tz",
-                    "pm8350b-ibat-lvl0",
-                    "pm8350b-ibat-lvl1",
-                    "pm8350b-bcl-lvl0",
-                    "pm8350b-bcl-lvl1",
-                    "pm8350b-bcl-lvl2",
-                    "socd",
-                    "pmr735b_tz"),
-        )
+    val emptyThermal: Map<String, List<String>> = mapOf("S22_Ultra" to
+            listOf("sdr0-pa0",
+            "sdr1-pa0",
+            "pm8350b_tz",
+            "pm8350b-ibat-lvl0",
+            "pm8350b-ibat-lvl1",
+            "pm8350b-bcl-lvl0",
+            "pm8350b-bcl-lvl1",
+            "pm8350b-bcl-lvl2",
+            "socd",
+            "pmr735b_tz"))
 
     val ddrfreq : Map<String, List<Int>> = mapOf(
         "S22_Ultra" to listOf(547000, 768000, 1555000, 1708000, 2092000, 2736000, 3196000), // 7 levels
-        "S24" to listOf()
+        "S24" to listOf(421000, 676000, 845000, 1014000, 1352000, 1539000, 1716000, 2028000, 2288000, 2730000, 3172000, 3738000, 4206000) // 13 levels
     )
 
     constructor(device: String) : this() {
@@ -1134,18 +1132,28 @@ class DVFS() : Device() {
 
         // S22 Ultra version (need to check S24)
         val freq = freqs[freqIndex]
-        command += "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/max_freq; "+
-                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/min_freq; "+
-                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/max_freq; "+
-                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/min_freq; "+
-                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/max_freq; "+
-                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/min_freq; "+
-                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/max_freq; "+
-                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/min_freq; "+
-                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/max_freq; "+
-                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/min_freq; "+
-                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/max_freq; "+
-                "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/min_freq; "
+        Log.d("CHECKER", "$freq")
+        when (device) {
+            // Snapdragon 8 Gen 1
+            "S22_Ultra" -> command += "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/max_freq; " +
+                                      "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/min_freq; " +
+                                      "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/max_freq; " +
+                                      "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/min_freq; " +
+                                      "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/max_freq; " +
+                                      "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/min_freq; " +
+                                      "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/max_freq; " +
+                                      "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/min_freq; " +
+                                      "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/max_freq; " +
+                                      "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/min_freq; " +
+                                      "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/max_freq; " +
+                                      "echo $freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/min_freq; "
+
+            // Exynos 2400
+            "S24" -> command += "echo $freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_min; " +
+                                "echo $freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_max; "
+
+        }
+        Log.d("CHECKER", command)
 
         // run android kernel command
         val process = Runtime.getRuntime().exec(command)
@@ -1161,20 +1169,25 @@ class DVFS() : Device() {
         val freqs = ddrfreq[device]
         val max_freq = freqs?.get(freqs.size-1)
         val min_freq = freqs?.get(0)
-        // S22 Ultra version (need to check S24)
-        val command = "su -c "+
-                "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/max_freq; "+
-                "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/min_freq; "+
-                "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/max_freq; "+
-                "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/min_freq; "+
-                "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/max_freq; "+
-                "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/min_freq; "+
-                "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/max_freq; "+
-                "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/min_freq; "+
-                "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/max_freq; "+
-                "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/min_freq; "+
-                "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/max_freq; "+
-                "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/min_freq; "
+
+        var command = "su -c "
+        when(device) {
+            "S22_Ultra" -> command += "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/max_freq; " +
+                                      "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/min_freq; " +
+                                      "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/max_freq; " +
+                                      "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/min_freq; " +
+                                      "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/max_freq; " +
+                                      "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/min_freq; " +
+                                      "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/max_freq; " +
+                                      "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/min_freq; " +
+                                      "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/max_freq; " +
+                                      "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/min_freq; " +
+                                      "echo $max_freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/max_freq; " +
+                                      "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/min_freq; "
+            "S24" -> command += "echo $max_freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_max; " +
+                                "echo $min_freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_min; "
+        }
+
 
         // run android kernel command
         val process = Runtime.getRuntime().exec(command)
@@ -1848,7 +1861,7 @@ fun ChatInput(
     var qa_idx = 0
     // load csv file for hotpot qa
     var qa_lists = readCSV(context = context, filename = "datasets/hotpot_qa.csv")
-    val qa_limit = 4
+    val qa_limit = 20
     var prefill_tot: Double = 0.0
     var decode_tot: Double = 0.0
     var sigterm = mutableStateOf(false)
@@ -1915,15 +1928,25 @@ fun ChatInput(
         TextButton(onClick = {
             // set clock frequency
             // implementation in 871 - 962 lines
-//            val dvfs = DVFS("S24")
-            val dvfs = DVFS("S22_Ultra")
-            val freqIndices = listOf(9,9,9)
-            dvfs.unsetCPUFrequency(dvfs.clusterIndices)
-            dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra ~14, ~16, ~19
+
+            // S24 (Exynos 2400)
+            //val dvfs = DVFS("S24")
+            //val freqIndices = listOf(6, 6, 6, 6)
+
+            // S22 Ultra (Snapdragon 8 Gen 1)
+            //val dvfs = DVFS("S22_Ultra")
+            //val freqIndices = listOf(10, 10, 10)
+
+            //dvfs.unsetCPUFrequency(dvfs.clusterIndices)
+            //dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
             //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(0, 0, 0, 0)) // S24
 
             // RAM DVFS
-            dvfs.setRAMFrequency(5)  // S22 Ultra ~6
+            // (S22 Ultra) 547000 768000 1555000 1708000 2092000 2736000 3196000
+            // (S24) 421000 676000 845000 1014000 1352000 1539000 1716000 2028000 2288000 2730000 3172000 3738000 4206000
+            //dvfs.setRAMFrequency(0)
+            //Thread.sleep(100) // to stabilize
+
 
 
             // for hotpot_qa
@@ -1931,38 +1954,23 @@ fun ChatInput(
 
             //recording start
             val startTime = System.currentTimeMillis()
-
-            // infer_info 초기화
-            var path = "/sdcard/Documents/"
-            var file = "infer_info.txt"
-            var writefile = File(path, file);
-            var writer = FileWriter(writefile);
-            writer.use { writer ->
-                //values.forEach { row ->
-                writer.write("time,prefill,decode"+ "\n");
-                writer.flush();
-                //}
-            }
 //            runBlocking {
 //                val jobs = listOf (
-            CoroutineScope(Dispatchers.IO).launch {
-                recordProcessing(
-                    "/sdcard/Documents/",
-                    "hard_info.txt",
-                    startTime,
-                    dvfs.clusterIndices,
-                    dvfs.emptyThermal[dvfs.device],
-                    sigterm
-                )
-
-                delay(2000)
-                ShareResult(context)
-            }
-
+//            CoroutineScope(Dispatchers.IO).launch {
+//                recordProcessing(
+//                    "/sdcard/Documents/",
+//                    "hard_info.txt",
+//                    startTime,
+//                    dvfs.clusterIndices,
+//                    dvfs.emptyThermal[dvfs.device],
+//                    sigterm
+//                )
+//
+//                delay(2000)
+//                ShareResult(context)
+//            }
             coroutineScope.launch {
                 qa_idx = 1
-
-
                 while (qa_idx < qa_limit + 1) {
 
                     if (qa_idx != 1) {
@@ -1973,7 +1981,7 @@ fun ChatInput(
                         true    // inform LLM active: isActive turns false in JNIrun function.
                     text = qa_lists[qa_idx][1]  //
                     val temp =
-                        arrayListOf(((System.currentTimeMillis() - startTime)/1000.0).toString()) // store system time
+                        arrayListOf((System.currentTimeMillis() - startTime).toString()) // store system time
                     onSendButtonClicked()
                     qa_idx++
                     //              text = "write"
@@ -1992,18 +2000,18 @@ fun ChatInput(
                     queryTimes.add(temp) // add system time
 
                     // activate 1688-1689 if you want to record at every query
-                    writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
-                    queryTimes.clear()
+//                    writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
+//                    queryTimes.clear()
                 }
 
                 sigterm.value = true
                 //android.os.Process.killProcess(r_pid.intValue)
-                writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
+//                writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
 
                 //Thread.sleep(1000) // for stability
                 //android.os.Process.killProcess(android.os.Process.myPid()) // activate if you want to check experiment termination
-                dvfs.unsetCPUFrequency(dvfs.clusterIndices)
-                dvfs.unsetRAMFrequency()
+//                dvfs.unsetCPUFrequency(dvfs.clusterIndices)
+//                dvfs.unsetRAMFrequency()
             }
         }) {
             Text(
@@ -2413,10 +2421,13 @@ fun getRecordsName(clusterIndices: List<Int>, emptyThermal: List<String>?): Stri
     process2.waitFor()
 
     names += tempRecord2.replace("\n", ",")
-    names += "power_now,prime_max_freq,prime_min_freq,prime_cur_freq,prime-latfloor_max_freq,prime-latfloor_min_freq,prime-latfloor_cur_freq,gold_max_freq,gold_min_freq,gold_cur_freq,gold-compute_max_freq,gold-compute_min_freq,gold-compute_cur_freq,silver_max_freq,silver_min_freq,silver_cur_freq,bwmon-ddr_max_freq,bwmon-ddr_min_freq,bwmon-ddr_cur_freq,"
+    names += "power_now,"
 
     Log.d("TEST", "names: $names")
     Log.d("TEST", "emptyThermal: $emptyThermal")
+
+    // RAM DVFS frequency name
+    names += "scaling_devfreq_max, scaling_devfreq_min, cur_freq"
 
     if (emptyThermal != null) {
         for (empty in emptyThermal) {
@@ -2437,30 +2448,15 @@ fun getHardRecords(clusterIndices: List<Int>): String {
     clusterIndices.forEach { index ->
         command += "awk '{print \$1/1000}' /sys/devices/system/cpu/cpu$index/cpufreq/scaling_max_freq; awk '{print \$1/1000}' /sys/devices/system/cpu/cpu$index/cpufreq/scaling_cur_freq;"
     }
-
+//
     command = command +
             "awk '{print \$2/1024}' /proc/meminfo; " +                // memory info
             "awk '{print}' /sys/class/power_supply/battery/power_now; " // power consumption
 
-    // Memory clock
-    command = command + "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/max_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/min_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime/cur_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/max_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/min_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:prime-latfloor/cur_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/max_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/min_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold/cur_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/max_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/min_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:gold-compute/cur_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/max_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/min_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/soc:qcom,memlat:ddr:silver/cur_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/max_freq; "+
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/min_freq; " +
-            "awk '{print \$1/1000}' /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/cur_freq; "
+    // S24 RAM DVFS
+    command += "awk '{print \$1/1000}' /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_max; " +
+            "awk '{print \$1/1000}' /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_min; " +
+            "awk '{print \$1/1000}' /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/cur_freq; "
 
     val process = Runtime.getRuntime().exec(command)
     val reader = BufferedReader(InputStreamReader(process.inputStream))
@@ -2501,7 +2497,7 @@ fun recordProcessing(
     //}
     val names = getRecordsName(clusterIndices, emptyThermal)
     var writefile = File(path, file);
-    var writer = FileWriter(writefile);
+    var writer = FileWriter(writefile); // allow appending
     writer.use { writer ->
         //values.forEach { row ->
         writer.write(names + "\n");
@@ -2513,7 +2509,7 @@ fun recordProcessing(
     while (!sigterm.value) {
         //val power = getRecord("/sys/class/power_supply/battery/", "power_now")
         //val temp = (getRecord("/sys/devices/virtual/thermal/thermal_zone77/", "temp").toDouble()/1000).toString() // convert uC to C
-        val curTimeMillis = ((System.currentTimeMillis() - startTime)/1000.0).toString() // ms [unit]
+        val curTimeMillis = (System.currentTimeMillis() - startTime).toString() // ms [unit]
         val records = getHardRecords(clusterIndices)
         // packing records into one row
         val record = listOf(curTimeMillis, records.replace("\n", ", "))
