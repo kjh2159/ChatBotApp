@@ -1917,13 +1917,13 @@ fun ChatInput(
             // implementation in 871 - 962 lines
 //            val dvfs = DVFS("S24")
             val dvfs = DVFS("S22_Ultra")
-            val freqIndices = listOf(6,6,6)
+            val freqIndices = listOf(9,9,9)
             dvfs.unsetCPUFrequency(dvfs.clusterIndices)
             dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra ~14, ~16, ~19
             //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(0, 0, 0, 0)) // S24
 
             // RAM DVFS
-//            dvfs.setRAMFrequency(4)  // S22 Ultra ~6
+            dvfs.setRAMFrequency(5)  // S22 Ultra ~6
 
 
             // for hotpot_qa
