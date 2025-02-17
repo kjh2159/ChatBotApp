@@ -1035,6 +1035,13 @@ class DVFS() : Device() {
                 3072000,
                 3207000
             ) // 27
+        ),
+
+        // path: /sys/devices/system/cpu/cpufreq/policy0/scaling_available_frequencies (policy can be 0, 4, 7)
+        "Pixel9" to mapOf(
+            0 to listOf(820000, 955000, 1098000, 1197000, 1328000, 1425000, 1548000, 1696000, 1849000, 1950000),
+            4 to listOf(357000, 578000, 648000, 787000, 910000, 1065000, 1221000, 1328000, 1418000, 1549000, 1795000, 1945000, 2130000, 2245000, 2367000, 2450000, 2600000),
+            7 to listOf(700000, 1164000, 1396000, 1557000, 1745000, 1885000, 1999000, 2147000, 2294000, 2363000, 2499000, 2687000, 2802000, 2914000, 2943000, 2970000, 3015000, 3105000)
         )
     )
     val emptyThermal: Map<String, List<String>> = mapOf("S22_Ultra" to
@@ -1051,7 +1058,8 @@ class DVFS() : Device() {
 
     val ddrfreq : Map<String, List<Int>> = mapOf(
         "S22_Ultra" to listOf(547000, 768000, 1555000, 1708000, 2092000, 2736000, 3196000), // 7 levels
-        "S24" to listOf(421000, 676000, 845000, 1014000, 1352000, 1539000, 1716000, 2028000, 2288000, 2730000, 3172000, 3738000, 4206000) // 13 levels
+        "S24" to listOf(421000, 676000, 845000, 1014000, 1352000, 1539000, 1716000, 2028000, 2288000, 2730000, 3172000, 3738000, 4206000), // 13 levels
+        "Pixel9" to listOf(421000, 546000, 676000, 845000, 1014000, 1352000, 1539000, 1716000, 2028000, 2288000, 2730000, 3172000, 3744000)
     )
 
     constructor(device: String) : this() {
@@ -1059,6 +1067,7 @@ class DVFS() : Device() {
         when (device) {
             "S22_Ultra" -> clusterIndices = listOf(0, 4, 7)
             "S24" -> clusterIndices = listOf(0, 4, 7, 9)
+            "Pixel9" -> clusterIndices = listOf(0, 4, 7)
         }
     }
 
@@ -1152,6 +1161,10 @@ class DVFS() : Device() {
             "S24" -> command += "echo $freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_min; " +
                                 "echo $freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_max; "
 
+            // Google Tensor 4
+            "Pixel9" -> command += "echo $freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/min_freq; " +
+                                   "echo $freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/max_freq; "
+
         }
         Log.d("CHECKER", command)
 
@@ -1186,6 +1199,9 @@ class DVFS() : Device() {
                                       "echo $min_freq > /sys/devices/system/cpu/bus_dcvs/DDR/19091000.qcom,bwmon-ddr/min_freq; "
             "S24" -> command += "echo $max_freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_max; " +
                                 "echo $min_freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_min; "
+            // Google Tensor 4
+            "Pixel9" -> command += "echo $min_freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/min_freq; " +
+                                   "echo $max_freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/max_freq; "
         }
 
 
@@ -1934,17 +1950,17 @@ fun ChatInput(
             //val freqIndices = listOf(6, 6, 6, 6)
 
             // S22 Ultra (Snapdragon 8 Gen 1)
-            //val dvfs = DVFS("S22_Ultra")
-            //val freqIndices = listOf(10, 10, 10)
+            val dvfs = DVFS("Pixel9")
+            val freqIndices = listOf(0, 2, 2)
 
             //dvfs.unsetCPUFrequency(dvfs.clusterIndices)
-            //dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
+            dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
             //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(0, 0, 0, 0)) // S24
 
             // RAM DVFS
             // (S22 Ultra) 547000 768000 1555000 1708000 2092000 2736000 3196000
             // (S24) 421000 676000 845000 1014000 1352000 1539000 1716000 2028000 2288000 2730000 3172000 3738000 4206000
-            //dvfs.setRAMFrequency(0)
+            dvfs.setRAMFrequency(0)
             //Thread.sleep(100) // to stabilize
 
 
@@ -1954,21 +1970,20 @@ fun ChatInput(
 
             //recording start
             val startTime = System.currentTimeMillis()
-//            runBlocking {
-//                val jobs = listOf (
-//            CoroutineScope(Dispatchers.IO).launch {
-//                recordProcessing(
-//                    "/sdcard/Documents/",
-//                    "hard_info.txt",
-//                    startTime,
-//                    dvfs.clusterIndices,
-//                    dvfs.emptyThermal[dvfs.device],
-//                    sigterm
-//                )
-//
-//                delay(2000)
-//                ShareResult(context)
-//            }
+            CoroutineScope(Dispatchers.IO).launch {
+                recordProcessing(
+                    "/sdcard/Documents/",
+                    "hard_info.txt",
+                    startTime,
+                    dvfs.clusterIndices,
+                    dvfs.emptyThermal[dvfs.device],
+                    sigterm,
+                    dvfs.device
+                )
+
+                delay(2000)
+                ShareResult(context)
+            }
             coroutineScope.launch {
                 qa_idx = 1
                 while (qa_idx < qa_limit + 1) {
@@ -1977,11 +1992,9 @@ fun ChatInput(
                         prefill_tot += vm.profilingTime.value!![1] ?: 0.0
                         decode_tot += vm.profilingTime.value!![2] ?: 0.0
                     }
-                    vm.isActive.value =
-                        true    // inform LLM active: isActive turns false in JNIrun function.
+                    vm.isActive.value = true    // inform LLM active: isActive turns false in JNIrun function.
                     text = qa_lists[qa_idx][1]  //
-                    val temp =
-                        arrayListOf((System.currentTimeMillis() - startTime).toString()) // store system time
+                    val temp = arrayListOf(((System.currentTimeMillis() - startTime)/1000).toString()) // store system time
                     onSendButtonClicked()
                     qa_idx++
                     //              text = "write"
@@ -1990,8 +2003,6 @@ fun ChatInput(
                     while (vm.isActive.value) {
                         //Log.e("CHECKER", "Active")
                         delay(20)
-                        //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(14, 16, 19)) // S22 Ultra
-                        //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(16, 20, 24, 26)) // S24
                         continue
                     }
                     delay(5)
@@ -2000,18 +2011,19 @@ fun ChatInput(
                     queryTimes.add(temp) // add system time
 
                     // activate 1688-1689 if you want to record at every query
-//                    writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
-//                    queryTimes.clear()
+                    writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
+                    queryTimes.clear()
                 }
 
                 sigterm.value = true
                 //android.os.Process.killProcess(r_pid.intValue)
-//                writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
+                writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
 
-                //Thread.sleep(1000) // for stability
+                Thread.sleep(1000) // for stability
                 //android.os.Process.killProcess(android.os.Process.myPid()) // activate if you want to check experiment termination
-//                dvfs.unsetCPUFrequency(dvfs.clusterIndices)
-//                dvfs.unsetRAMFrequency()
+                //Reset settings
+                dvfs.unsetCPUFrequency(dvfs.clusterIndices)
+                dvfs.unsetRAMFrequency()
             }
         }) {
             Text(
@@ -2397,7 +2409,7 @@ fun parseCSVLine(line: String): List<String> {
     return values
 }
 
-fun getRecordsName(clusterIndices: List<Int>, emptyThermal: List<String>?): String {
+fun getRecordsName(clusterIndices: List<Int>, emptyThermal: List<String>?, deviceName: String): String {
     var names = "Time,"
     // reference type of pid
     var command = "su -c cat /sys/devices/virtual/thermal/thermal_zone*/type"
@@ -2421,7 +2433,8 @@ fun getRecordsName(clusterIndices: List<Int>, emptyThermal: List<String>?): Stri
     process2.waitFor()
 
     names += tempRecord2.replace("\n", ",")
-    names += "power_now,"
+    if (deviceName == "Pixel9") { names += "current_now,voltage_now,"
+    } else { names += "power_now,current_now,voltage_now," }
 
     Log.d("TEST", "names: $names")
     Log.d("TEST", "emptyThermal: $emptyThermal")
@@ -2442,7 +2455,10 @@ fun getHardRecords(clusterIndices: List<Int>): String {
     // reference type of pid
     var command =
         "su -c awk '{print \$1/1000}' /sys/devices/virtual/thermal/thermal_zone*/temp; " + // thermal info
-                "awk '{print \$1}' /sys/kernel/gpu/gpu_min_clock; awk '{print \$1}' /sys/kernel/gpu/gpu_max_clock; " //gpu clock
+                // Galaxy Series
+                "awk '{print \$1}' /sys/kernel/gpu/gpu_min_clock; awk '{print \$1}' /sys/kernel/gpu/gpu_max_clock; " + //gpu clock
+                // Pixel
+                "awk '{print \$1}' /sys/devices/platform/1f000000.mali/scaling_min_freq; awk '{print \$1}' /sys/devices/platform/1f000000.mali/scaling_max_freq; " //gpu clock
 
     // 0, 4, 7) 8 Gen 1 CPU: 1 + 3 + 4 | 7: prime, 4: Gold, 0 Silver
     clusterIndices.forEach { index ->
@@ -2451,11 +2467,13 @@ fun getHardRecords(clusterIndices: List<Int>): String {
 //
     command = command +
             "awk '{print \$2/1024}' /proc/meminfo; " +                // memory info
-            "awk '{print}' /sys/class/power_supply/battery/power_now; " // power consumption
+            "awk '{print}' /sys/class/power_supply/battery/power_now;" +   // power consumption // pixel does not have power_now
+            "awk '{print}' /sys/class/power_supply/battery/current_now;" + // current
+            "awk '{print}' /sys/class/power_supply/battery/voltage_now;"   // voltage
 
-    // S24 RAM DVFS
-    command += "awk '{print \$1/1000}' /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_max; " +
-            "awk '{print \$1/1000}' /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_min; " +
+    // S24/Pixel9 RAM DVFS
+    command += "awk '{print \$1/1000}' /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/max_freq; " + // scaling_devfreq_max
+            "awk '{print \$1/1000}' /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/min_freq; " + // scaling_devfreq_min
             "awk '{print \$1/1000}' /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/cur_freq; "
 
     val process = Runtime.getRuntime().exec(command)
@@ -2485,7 +2503,8 @@ fun recordProcessing(
     startTime: Long,
     clusterIndices: List<Int>,
     emptyThermal: List<String>?,
-    sigterm: MutableState<Boolean>
+    sigterm: MutableState<Boolean>,
+    deviceName: String
 ) {
 
     //Tester Code
@@ -2495,7 +2514,7 @@ fun recordProcessing(
     //    Log.d("CHECKER", "recordProcessing2: $power")
     //    Thread.sleep(500)
     //}
-    val names = getRecordsName(clusterIndices, emptyThermal)
+    val names = getRecordsName(clusterIndices, emptyThermal, deviceName)
     var writefile = File(path, file);
     var writer = FileWriter(writefile); // allow appending
     writer.use { writer ->
@@ -2509,10 +2528,10 @@ fun recordProcessing(
     while (!sigterm.value) {
         //val power = getRecord("/sys/class/power_supply/battery/", "power_now")
         //val temp = (getRecord("/sys/devices/virtual/thermal/thermal_zone77/", "temp").toDouble()/1000).toString() // convert uC to C
-        val curTimeMillis = (System.currentTimeMillis() - startTime).toString() // ms [unit]
+        val curTimeSec = ((System.currentTimeMillis() - startTime)/1000).toString() // ms [unit]
         val records = getHardRecords(clusterIndices)
         // packing records into one row
-        val record = listOf(curTimeMillis, records.replace("\n", ", "))
+        val record = listOf(curTimeSec, records.replace("\n", ", "))
 
         Log.d("CHECKER", "records:$record")
         //writeRecord("/sdcard/Documents/", "test.txt", records)

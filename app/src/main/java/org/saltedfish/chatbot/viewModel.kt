@@ -229,6 +229,7 @@ class ChatViewModel : ViewModel() {
                 when(model_id){
                     0->"model/tinyllama-1.1B-chat-v0.4-q4_0.mllm"
                     1->"model/qwen-2.5-1.5b-instruct-q4_0_4_4.mllm"
+                    //1->"model/qwen-2.5-1.5b-instruct-q4_k.mllm"
                     2->"model/qwen-1.5-1.8b-chat-q4_0_4_4.mllm"
 
                     else->"model/phonelm-1.5b-instruct-q4_0_4_4.mllm"
