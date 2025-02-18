@@ -1059,7 +1059,7 @@ class DVFS() : Device() {
     val ddrfreq : Map<String, List<Int>> = mapOf(
         "S22_Ultra" to listOf(547000, 768000, 1555000, 1708000, 2092000, 2736000, 3196000), // 7 levels
         "S24" to listOf(421000, 676000, 845000, 1014000, 1352000, 1539000, 1716000, 2028000, 2288000, 2730000, 3172000, 3738000, 4206000), // 13 levels
-        "Pixel9" to listOf(421000, 546000, 676000, 845000, 1014000, 1352000, 1539000, 1716000, 2028000, 2288000, 2730000, 3172000, 3744000)
+        "Pixel9" to listOf(421000, 546000, 676000, 845000, 1014000, 1352000, 1539000, 1716000, 2028000, 2288000, 2730000, 3172000, 3744000) // 13 levels
     )
 
     constructor(device: String) : this() {
@@ -1951,7 +1951,7 @@ fun ChatInput(
 
             // S22 Ultra (Snapdragon 8 Gen 1)
             val dvfs = DVFS("Pixel9")
-            val freqIndices = listOf(0, 2, 2)
+            val freqIndices = listOf(0, 6, 6)
 
             //dvfs.unsetCPUFrequency(dvfs.clusterIndices)
             dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
@@ -1994,7 +1994,7 @@ fun ChatInput(
                     }
                     vm.isActive.value = true    // inform LLM active: isActive turns false in JNIrun function.
                     text = qa_lists[qa_idx][1]  //
-                    val temp = arrayListOf(((System.currentTimeMillis() - startTime)/1000).toString()) // store system time
+                    val temp = arrayListOf(((System.currentTimeMillis() - startTime).toDouble()/1000).toString()) // store system time
                     onSendButtonClicked()
                     qa_idx++
                     //              text = "write"
@@ -2528,7 +2528,7 @@ fun recordProcessing(
     while (!sigterm.value) {
         //val power = getRecord("/sys/class/power_supply/battery/", "power_now")
         //val temp = (getRecord("/sys/devices/virtual/thermal/thermal_zone77/", "temp").toDouble()/1000).toString() // convert uC to C
-        val curTimeSec = ((System.currentTimeMillis() - startTime)/1000).toString() // ms [unit]
+        val curTimeSec = ((System.currentTimeMillis() - startTime).toDouble()/1000).toString() // ms [unit]
         val records = getHardRecords(clusterIndices)
         // packing records into one row
         val record = listOf(curTimeSec, records.replace("\n", ", "))
