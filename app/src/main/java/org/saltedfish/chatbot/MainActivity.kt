@@ -1882,6 +1882,8 @@ fun ChatInput(
     var decode_tot: Double = 0.0
     var sigterm = mutableStateOf(false)
     var queryTimes = ArrayList<ArrayList<String>>()
+    // Initialization
+    val infer_names = queryTimes.add(arrayListOf("systime", "prefill", "decode", "prefill_tok", "decode_tok", "ttft"))
 
 //softkeyborad
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -1951,18 +1953,17 @@ fun ChatInput(
 
             // S22 Ultra (Snapdragon 8 Gen 1)
             val dvfs = DVFS("Pixel9")
-            val freqIndices = listOf(0, 6, 6)
+            val freqIndices = listOf(0, 16, 16)
 
-            //dvfs.unsetCPUFrequency(dvfs.clusterIndices)
+            dvfs.unsetCPUFrequency(dvfs.clusterIndices)
             dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
             //dvfs.setCPUFrequency(dvfs.clusterIndices, listOf(0, 0, 0, 0)) // S24
 
             // RAM DVFS
             // (S22 Ultra) 547000 768000 1555000 1708000 2092000 2736000 3196000
             // (S24) 421000 676000 845000 1014000 1352000 1539000 1716000 2028000 2288000 2730000 3172000 3738000 4206000
-            dvfs.setRAMFrequency(0)
+            dvfs.setRAMFrequency(10)
             //Thread.sleep(100) // to stabilize
-
 
 
             // for hotpot_qa
@@ -2006,13 +2007,13 @@ fun ChatInput(
                         continue
                     }
                     delay(5)
-                    temp.add((vm.profilingTime.value!![1] ?: 0.0).toString())
-                    temp.add((vm.profilingTime.value!![2] ?: 0.0).toString())
-                    queryTimes.add(temp) // add system time
 
+                    // collect infer infos
+                    for (i: Int in 1..5) { temp.add((vm.profilingTime.value!![i] ?: 0.0).toString()) }
+                    queryTimes.add(temp) // add system time
                     // activate 1688-1689 if you want to record at every query
                     writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
-                    queryTimes.clear()
+                    queryTimes.clear() // to protect multiple title lines
                 }
 
                 sigterm.value = true

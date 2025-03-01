@@ -38,7 +38,19 @@ Now my query is: %QUERY%
 <|im_end|>
 <|im_start|>assistant
 """
-val MODEL_NAMES = arrayOf("Qwen 2.5","","Bert","TinyLlama", "Qwen 1.5")
+//val PROMPT = """<|im_start|>system
+//You are a helpful assistant.<|im_end|>
+//<|im_start|>user
+//
+//Here is a list of functions:
+//
+//%DOC%
+//
+//Now my query is: %QUERY%
+//<|im_end|>
+//<|im_start|>assistant
+//"""
+val MODEL_NAMES = arrayOf("Qwen 2.5","","Bert","PhoneLM", "Qwen 1.5")
 class ChatViewModel : ViewModel() {
     //    private var _inputText: MutableLiveData<String> = MutableLiveData<String>()
 //    val inputText: LiveData<String> = _inputText
@@ -227,10 +239,11 @@ class ChatViewModel : ViewModel() {
             // Chat
             3->{
                 when(model_id){
-                    0->"model/tinyllama-1.1B-chat-v0.4-q4_0.mllm"
+                    0->"model/phonelm-1.5b-instruct-q4_0_4_4.mllm"
                     1->"model/qwen-2.5-1.5b-instruct-q4_0_4_4.mllm"
                     //1->"model/qwen-2.5-1.5b-instruct-q4_k.mllm"
                     2->"model/qwen-1.5-1.8b-chat-q4_0_4_4.mllm"
+                    //2->"model/qwen-1.5-0.5b-q4_k.mllm"
 
                     else->"model/phonelm-1.5b-instruct-q4_0_4_4.mllm"
                 }
@@ -276,7 +289,7 @@ class ChatViewModel : ViewModel() {
             1->"model/fuyu_vocab.mllm"
             3->{
                 when(model_id){
-                    0->"model/tinyllama_vocab.mllm"
+                    0->"model/phonelm_vocab.mllm"
                     1->"model/qwen2.5_vocab.mllm"
                     2->"model/qwen_vocab.mllm"
                     else->""
@@ -284,7 +297,7 @@ class ChatViewModel : ViewModel() {
             }
             4->{
                 when(model_id){
-                    0->"model/tinyllama_vocab.mllm"
+                    0->"model/phonelm_vocab.mllm"
                     1->"model/qwen2.5_vocab.mllm"
                     2->"model/qwen_vocab.mllm"
                     else->""
@@ -294,7 +307,7 @@ class ChatViewModel : ViewModel() {
         }
         val mergePath = when (model_id){
             1->"model/qwen2.5_merges.txt"
-            0->"model/tinyllama-1.0_merges.txt"
+            0->"model/phonelm_merges.txt"
             2->"model/qwen_merges.txt"
             else->""
         }
