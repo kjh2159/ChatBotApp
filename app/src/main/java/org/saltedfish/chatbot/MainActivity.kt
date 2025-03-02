@@ -1162,7 +1162,7 @@ class DVFS() : Device() {
                                 "echo $freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_max; "
 
             // Google Tensor 4
-            "Pixel9" -> command += "echo $freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/min_freq; " +
+            "Pixel9" -> command += "echo $freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_min; " +
                                    "echo $freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/max_freq; "
 
         }
@@ -1200,7 +1200,7 @@ class DVFS() : Device() {
             "S24" -> command += "echo $max_freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_max; " +
                                 "echo $min_freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_min; "
             // Google Tensor 4
-            "Pixel9" -> command += "echo $min_freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/min_freq; " +
+            "Pixel9" -> command += "echo $min_freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_min; " + // scaling_devfreq_min
                                    "echo $max_freq > /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/max_freq; "
         }
 
@@ -1883,7 +1883,7 @@ fun ChatInput(
     var sigterm = mutableStateOf(false)
     var queryTimes = ArrayList<ArrayList<String>>()
     // Initialization
-    val infer_names = queryTimes.add(arrayListOf("systime", "prefill", "decode", "prefill_tok", "decode_tok", "ttft"))
+    queryTimes.add(arrayListOf("systime", "prefill", "decode", "prefill_tok", "decode_tok", "ttft"))
 
 //softkeyborad
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -1953,7 +1953,7 @@ fun ChatInput(
 
             // S22 Ultra (Snapdragon 8 Gen 1)
             val dvfs = DVFS("Pixel9")
-            val freqIndices = listOf(0, 16, 16)
+            val freqIndices = listOf(0, 8, 8)
 
             dvfs.unsetCPUFrequency(dvfs.clusterIndices)
             dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
