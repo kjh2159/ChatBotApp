@@ -157,6 +157,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
 
 fun Context.getActivity(): ComponentActivity? = when (this) {
     is ComponentActivity -> this
@@ -1947,13 +1948,24 @@ fun ChatInput(
             // set clock frequency
             // implementation in 871 - 962 lines
 
+            /**
+             *  This block is made for perfetto.
+             *  Require a config.pbtx file in the location: /data/local/tmp/
+             *  Please annotate hard_record and infer_record functions.
+             *  **/
+//            CoroutineScope(Dispatchers.IO).launch {
+//                val cmd = "su -c perfetto -c /data/local/tmp/config.pbtx --txt -o /data/local/tmp/trace.perfetto-trace;"
+//                val process = Runtime.getRuntime().exec(cmd)
+//                process.waitFor()
+//            }
+
             // S24 (Exynos 2400)
             //val dvfs = DVFS("S24")
-            //val freqIndices = listOf(6, 6, 6, 6)
+            //val freqIndices = listOf(0, 6, 8, 8) // LITTLE/MIDL/MIDH/BIG
 
-            // S22 Ultra (Snapdragon 8 Gen 1)
+            // Pixel9
             val dvfs = DVFS("Pixel9")
-            val freqIndices = listOf(0, 8, 8)
+            val freqIndices = listOf(0, 16, 16) // LITTLE/MID/BIG
 
             dvfs.unsetCPUFrequency(dvfs.clusterIndices)
             dvfs.setCPUFrequency(dvfs.clusterIndices, freqIndices) // S22 Ultra 14, 16, 19
@@ -1962,7 +1974,7 @@ fun ChatInput(
             // RAM DVFS
             // (S22 Ultra) 547000 768000 1555000 1708000 2092000 2736000 3196000
             // (S24) 421000 676000 845000 1014000 1352000 1539000 1716000 2028000 2288000 2730000 3172000 3738000 4206000
-            dvfs.setRAMFrequency(10)
+            dvfs.setRAMFrequency(12)
             //Thread.sleep(100) // to stabilize
 
 
@@ -1985,6 +1997,11 @@ fun ChatInput(
                 delay(2000)
                 ShareResult(context)
             }
+
+            //CoroutineScope(Dispatchers.IO).launch {
+            //    measureRandomAccessLatency(sigterm)
+            //}
+
             coroutineScope.launch {
                 qa_idx = 1
                 while (qa_idx < qa_limit + 1) {
@@ -2014,10 +2031,10 @@ fun ChatInput(
                     // activate 1688-1689 if you want to record at every query
                     writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
                     queryTimes.clear() // to protect multiple title lines
+                    //delay(60000)
                 }
 
                 sigterm.value = true
-                //android.os.Process.killProcess(r_pid.intValue)
                 writeRecord("/sdcard/Documents", "infer_info.txt", queryTimes)
 
                 Thread.sleep(1000) // for stability
@@ -2474,7 +2491,7 @@ fun getHardRecords(clusterIndices: List<Int>): String {
 
     // S24/Pixel9 RAM DVFS
     command += "awk '{print \$1/1000}' /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/max_freq; " + // scaling_devfreq_max
-            "awk '{print \$1/1000}' /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/min_freq; " + // scaling_devfreq_min
+            "awk '{print \$1/1000}' /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/scaling_devfreq_min; " + // scaling_devfreq_min
             "awk '{print \$1/1000}' /sys/devices/platform/17000010.devfreq_mif/devfreq/17000010.devfreq_mif/cur_freq; "
 
     val process = Runtime.getRuntime().exec(command)
@@ -2551,3 +2568,23 @@ fun recordProcessing(
 
     return;
 }
+
+
+fun measureRandomAccessLatency(sigterm: MutableState<Boolean>){
+    val size = 1024 * 1024
+
+    while (!sigterm.value) {
+        val array = IntArray(size) { it }
+        val indices = array.indices.shuffled() // random index
+        val startTime = System.nanoTime()
+        var sum = 0
+        for (i in indices) {
+            sum += array[i] // random access
+        }
+        val endTime = System.nanoTime()
+        Log.e("RAM ACTUAL LATENCY", ((endTime - startTime) / size).toString())
+        Thread.sleep(100)
+    }
+    //return (endTime - startTime) / size
+}
+
